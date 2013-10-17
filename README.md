@@ -7,4 +7,6 @@ Developers
 Emmanouil Maroudas    emmmarou@uth.gr
 Kalandaridis Theodosios thkaland@uth.gr
 Mylonas Aggelos agmylona@gmail.com
+Kousias Konstantinos kokousia@inf.uth.gr
+
 
