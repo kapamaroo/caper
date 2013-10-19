@@ -137,11 +137,14 @@ char *parse_eat_whitechars(char *buf) {
     char *end = current_input->raw_end;
     if (buf == end)
         return NULL;
-    while (buf != end)
-        if (isdelimiter(*buf))
+    while (buf != end) {
+        if (isdelimiter(*buf)) {
             buf++;
+            //printf("debug: found whitespace\n");
+        }
         else
             break;
+    }
     if (buf == end)
         return NULL;
     return buf;
@@ -153,8 +156,10 @@ char *parse_eat_newline(char *buf) {
 
     char *end = current_input->raw_end;
     while (buf != end) {
-        if (*buf++ != '\n')
+        if (*buf != '\n') {
             break;
+        }
+        buf++;
     }
     if (buf == end)
         return NULL;
@@ -178,10 +183,15 @@ char *parse_line(char *buf) {
 }
 
 char *parse_string(char *buf, char **name) {
+    //printf("in function: %s\n",__FUNCTION__);
+
     char *start = buf;
     int size = 0;
     char *end = current_input->raw_end;
-    while (start != end && !isdelimiter(*start)) {
+    while (buf != end) {
+        if (isdelimiter(*buf)) {
+            break;
+        }
         buf++;
         size++;
     }
@@ -192,14 +202,19 @@ char *parse_string(char *buf, char **name) {
         exit(EXIT_FAILURE);
     }
     *name = memcpy(*name,start,size);
-    *name[size] = '\0';
+    (*name)[size] = '\0';
 
     buf = parse_eat_whitechars(buf);
 
+    //printf("debug: new string \"%s\"\tsize=%d\n",*name,size);
+
+    //printf("out of function: %s\n",__FUNCTION__);
     return buf;
 }
 
 char *parse_value(char *buf, double *value) {
+    //printf("in function: %s\n",__FUNCTION__);
+
     char *endptr = buf;
     errno = 0;
     *value = strtod(buf,&endptr);
@@ -207,12 +222,25 @@ char *parse_value(char *buf, double *value) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+    if (buf == endptr) {
+        printf("Error: bad value\n");
+        exit(EXIT_FAILURE);
+    }
+
+    //printf("debug: value=%f\n",*value);
     buf = parse_eat_whitechars(endptr);
     return buf;
 }
 
 void grow(void **pool,unsigned long size, unsigned long element_size,
           unsigned long next) {
+#if 1
+    printf("error: grow does not work - exit.\n");
+    exit(EXIT_FAILURE);
+#endif
+
+    printf("in function: %s\n",__FUNCTION__);
+
     if (next == size) {
         if (size == ULONG_MAX) {
             printf("Out of memory: reached pool limit - exit.\n");
@@ -231,27 +259,42 @@ void grow(void **pool,unsigned long size, unsigned long element_size,
     }
 }
 
+static inline int isinvalidnodename(char *s) {
+    if (s[0] != '-')
+        return 0;
+    if (!isdigit(s[1]))
+        return 0;
+
+    printf("Error: bad node name \"%s\"\n",s);
+    return 1;
+}
+
 char *parse_element(char *buf) {
+    //printf("in function: %s\n",__FUNCTION__);
+
+    //printf("\n***  new element  ***\n\n");
+
     /* return NULL on end of buffer */
 
     /* eat the node specifier */
     struct element *s_el = &el_pool[el_pool_next++];
 
-    char type = *buf++;
+    char type = *buf;
     s_el->type = type;
 
     s_el->euid = set_euid();
 
     /* check if we need to resize the pool */
-    grow((void**)&el_pool,el_pool_size,sizeof(struct element),el_pool_next);
+    //grow((void**)&el_pool,el_pool_size,sizeof(struct element),el_pool_next);
 
+    //printf("element type: '%c'\n",type);
     switch (type) {
     case 'v':
     case 'i': {
         node_pool[node_pool_next++] = &s_el->_vi.vminus;
-        grow((void**)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
+        //grow((void**)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
         node_pool[node_pool_next++] = &s_el->_vi.vplus;
-        grow((void **)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
+        //grow((void **)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
 
         buf = parse_string(buf,&s_el->name);
         if (!buf || *buf == '\n') {
@@ -264,29 +307,41 @@ char *parse_element(char *buf) {
             printf("error: expected string - exit.\n");
             exit(EXIT_FAILURE);
         }
+        if (isinvalidnodename(s_el->_vi.vplus.name)) {
+            exit(EXIT_FAILURE);
+        }
 
         buf = parse_string(buf,&s_el->_vi.vminus.name);
         if (!buf || *buf == '\n') {
             printf("error: expected string - exit.\n");
             exit(EXIT_FAILURE);
         }
+        if (isinvalidnodename(s_el->_vi.vminus.name)) {
+            exit(EXIT_FAILURE);
+        }
 
         buf = parse_value(buf,&s_el->value);
-        if (!buf || *buf == '\n') {
-            printf("error: expected value - exit.\n");
+        if (!buf)
+            return NULL;
+        if (*buf != '\n') {
+            printf("error: invalid character '%c' after value - exit.\n",*buf);
             exit(EXIT_FAILURE);
         }
 
         set_nuid(&s_el->_vi.vminus);
         set_nuid(&s_el->_vi.vplus);
+
+        printf("%s %s %s %+8.4f\n",s_el->name, s_el->_vi.vplus.name,s_el->_vi.vminus.name,s_el->value);
+
+        break;
     }
     case 'r':
     case 'c':
     case 'l': {
         node_pool[node_pool_next++] = &s_el->_rcl.vminus;
-        grow((void**)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
+        //grow((void**)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
         node_pool[node_pool_next++] = &s_el->_rcl.vplus;
-        grow((void**)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
+        //grow((void**)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
 
         buf = parse_string(buf,&s_el->name);
         if (!buf || *buf == '\n') {
@@ -307,13 +362,19 @@ char *parse_element(char *buf) {
         }
 
         buf = parse_value(buf,&s_el->value);
-        if (!buf || *buf == '\n') {
-            printf("error: expected value - exit.\n");
+        if (!buf)
+            return NULL;
+        if (*buf != '\n') {
+            printf("error: invalid character '%c' after value - exit.\n",*buf);
             exit(EXIT_FAILURE);
         }
 
         set_nuid(&s_el->_rcl.vminus);
         set_nuid(&s_el->_rcl.vplus);
+
+        printf("%s %s %s %+8.4f\n",s_el->name, s_el->_vi.vplus.name,s_el->_vi.vminus.name,s_el->value);
+
+        break;
     }
     default:
         printf("Unknown element type '%c' - exit.\n",type);
@@ -324,6 +385,8 @@ char *parse_element(char *buf) {
 }
 
 char *parse_comment(char *buf) {
+    //printf("in function: %s\n",__FUNCTION__);
+
     /* return NULL on end of buffer */
 
     char *end = current_input->raw_end;
@@ -338,9 +401,22 @@ char *parse_comment(char *buf) {
 }
 
 char *parse_command(char *buf) {
+    //printf("in function: %s\n",__FUNCTION__);
+    printf("***  WARNING  ***    command parsing is not implemented yet! - skip command\n");
+
     /* return NULL on end of buffer */
 
     /* eat '.' */
     buf++;
+
+    char *end = current_input->raw_end;
+    while (buf != end) {
+        if (*buf == '\n')
+            break;
+        buf++;
+    }
+
+    buf = parse_eat_whitechars(buf);
+
     return buf;
 }
