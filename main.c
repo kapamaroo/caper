@@ -19,6 +19,6 @@ int main(int argc, char *argv[]) {
         parse_file(argv[i]);
     }
 
-    printf("\nTerminating... OK.\n\n");
+    printf("\nTerminating...\n\n");
     exit(EXIT_SUCCESS);
 }
