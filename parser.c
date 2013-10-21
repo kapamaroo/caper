@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #include "parser.h"
 
@@ -402,21 +403,39 @@ char *parse_comment(char *buf) {
 
 char *parse_command(char *buf) {
     //printf("in function: %s\n",__FUNCTION__);
-    printf("***  WARNING  ***    command parsing is not implemented yet! - skip command\n");
 
     /* return NULL on end of buffer */
 
     /* eat '.' */
     buf++;
 
+#if 0
+    char *name;
+    buf = parse_string(buf,&name);
+
+    if (strcmp(name,""))
+
+#else
+    printf("***  WARNING  ***    command parsing is not implemented yet! - skip command\n");
     char *end = current_input->raw_end;
     while (buf != end) {
         if (*buf == '\n')
             break;
         buf++;
     }
+#endif
 
     buf = parse_eat_whitechars(buf);
 
     return buf;
+}
+
+struct node **get_node_pool() {
+    assert(node_pool);
+    return node_pool;
+}
+
+struct element *get_element_pool() {
+    assert(el_pool);
+    return el_pool;
 }

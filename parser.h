@@ -63,4 +63,7 @@ void parser_init();
 
 int parse_file(const char *filename);
 
+struct node **get_node_pool();
+struct element *get_element_pool();
+
 #endif
