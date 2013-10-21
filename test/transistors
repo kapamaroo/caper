@@ -1,0 +1,11 @@
+*error no model name
+*q1 1 2 0
+
+q2 1 3 4 zzz
+Q3 1 4 5 qqq 55
+
+*m4 1 2 3
+*m8 1 2 3 4
+*m5 1 2 4 7 rrr
+*m6 4 5 6 7 rrr 4
+m7 4 5 6 7 rrr 4 8
