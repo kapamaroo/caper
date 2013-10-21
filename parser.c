@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include "parser.h"
 
@@ -128,10 +129,6 @@ int parse_file(const char *filename) {
     return error;
 }
 
-inline static int isdelimiter(char c) {
-    return isspace(c) && c != '\n';
-}
-
 char *parse_eat_whitechars(char *buf) {
     /* return NULL on end of buffer */
 
@@ -139,7 +136,7 @@ char *parse_eat_whitechars(char *buf) {
     if (buf == end)
         return NULL;
     while (buf != end) {
-        if (isdelimiter(*buf)) {
+        if (isspace(*buf) && *buf != '\n') {
             buf++;
             //printf("debug: found whitespace\n");
         }
@@ -181,6 +178,10 @@ char *parse_line(char *buf) {
     default:   buf = parse_element(buf);  break;
     }
     return buf;
+}
+
+inline static int isdelimiter(char c) {
+    return isspace(c); // && c != '\n';
 }
 
 char *parse_string(char *buf, char **name) {
@@ -280,13 +281,15 @@ char *parse_element(char *buf) {
     /* eat the node specifier */
     struct element *s_el = &el_pool[el_pool_next++];
 
-    char type = *buf;
+    char type = tolower(*buf);
     s_el->type = type;
 
     s_el->euid = set_euid();
 
     /* check if we need to resize the pool */
     //grow((void**)&el_pool,el_pool_size,sizeof(struct element),el_pool_next);
+
+#warning "consider capital letters too!"
 
     //printf("element type: '%c'\n",type);
     switch (type) {
@@ -377,6 +380,240 @@ char *parse_element(char *buf) {
 
         break;
     }
+    case 'q': {
+        node_pool[node_pool_next++] = &s_el->bjt.c;
+        //grow((void**)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+        node_pool[node_pool_next++] = &s_el->bjt.b;
+        //grow((void **)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+        node_pool[node_pool_next++] = &s_el->bjt.e;
+        //grow((void **)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+
+        buf = parse_string(buf,&s_el->name);
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node c- exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->bjt.c.name);
+        if (isinvalidnodename(s_el->bjt.c.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node b- exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->bjt.b.name);
+        if (isinvalidnodename(s_el->bjt.b.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node e- exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->bjt.e.name);
+        if (isinvalidnodename(s_el->bjt.e.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        set_nuid(&s_el->bjt.c);
+        set_nuid(&s_el->bjt.b);
+        set_nuid(&s_el->bjt.e);
+
+        if (!buf || *buf == '\n') {
+            //no model name
+            printf("error: expected string for model name - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        buf = parse_string(buf,&s_el->bjt.model.name);
+
+        printf("%s %s %s %s %s",
+               s_el->name,
+               s_el->bjt.c.name,
+               s_el->bjt.b.name,
+               s_el->bjt.e.name,
+               s_el->bjt.model.name);
+
+        if (!buf || *buf == '\n') {
+            //no area
+            s_el->bjt.area = DEFAULT_BJT_AREA;
+            printf(" %f\n",s_el->bjt.area);
+            return buf;
+        }
+        buf = parse_value(buf,&s_el->bjt.area);
+        printf(" %f\n",s_el->bjt.area);
+        if (!buf)
+            return NULL;
+        if (*buf != '\n') {
+            printf("error: invalid character '%c' after value - exit.\n",*buf);
+            exit(EXIT_FAILURE);
+        }
+
+        break;
+    }
+    case 'm': {
+        node_pool[node_pool_next++] = &s_el->mos.d;
+        //grow((void**)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+        node_pool[node_pool_next++] = &s_el->mos.g;
+        //grow((void **)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+        node_pool[node_pool_next++] = &s_el->mos.s;
+        //grow((void **)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+        node_pool[node_pool_next++] = &s_el->mos.b;
+        //grow((void **)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+
+        buf = parse_string(buf,&s_el->name);
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node d - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->mos.d.name);
+        if (isinvalidnodename(s_el->mos.d.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node g - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->mos.g.name);
+        if (isinvalidnodename(s_el->mos.g.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node s - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->mos.s.name);
+        if (isinvalidnodename(s_el->mos.s.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node b - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->mos.b.name);
+        if (isinvalidnodename(s_el->mos.b.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        set_nuid(&s_el->mos.d);
+        set_nuid(&s_el->mos.g);
+        set_nuid(&s_el->mos.s);
+        set_nuid(&s_el->mos.b);
+
+        if (!buf || *buf == '\n') {
+            //no model name
+            printf("error: expected string for model name - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        buf = parse_string(buf,&s_el->mos.model.name);
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected value for length\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_value(buf,&s_el->mos.l);
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected value for width\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_value(buf,&s_el->mos.w);
+
+        printf("%s %s %s %s %s %s %f %f",
+               s_el->name,
+               s_el->mos.d.name,
+               s_el->mos.g.name,
+               s_el->mos.s.name,
+               s_el->mos.b.name,
+               s_el->mos.model.name,
+               s_el->mos.length,
+               s_el->mos.width);
+
+        if (!buf)
+            return NULL;
+        if (*buf != '\n') {
+            printf("error: invalid character '%c' after value - exit.\n",*buf);
+            exit(EXIT_FAILURE);
+        }
+
+        break;
+    }
+    case 'd': {
+        node_pool[node_pool_next++] = &s_el->diode.vminus;
+        //grow((void**)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+        node_pool[node_pool_next++] = &s_el->diode.vplus;
+        //grow((void **)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+
+        buf = parse_string(buf,&s_el->name);
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node vplus - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->diode.vplus.name);
+        if (isinvalidnodename(s_el->diode.vplus.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected string for node vminus - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_string(buf,&s_el->diode.vminus.name);
+        if (isinvalidnodename(s_el->diode.vminus.name)) {
+            exit(EXIT_FAILURE);
+        }
+
+        set_nuid(&s_el->diode.vplus);
+        set_nuid(&s_el->diode.vminus);
+
+        if (!buf || *buf == '\n') {
+            //no model name
+            printf("error: expected string for model name - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        buf = parse_string(buf,&s_el->diode.model.name);
+#error FIXME
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected value for length\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_value(buf,&s_el->mos.l);
+
+        if (!buf || *buf == '\n') {
+            printf("error: expected value for width\n");
+            exit(EXIT_FAILURE);
+        }
+        buf = parse_value(buf,&s_el->mos.w);
+
+        printf("%s %s %s %s %s %s %f %f",
+               s_el->name,
+               s_el->mos.d.name,
+               s_el->mos.g.name,
+               s_el->mos.s.name,
+               s_el->mos.b.name,
+               s_el->mos.model.name,
+               s_el->mos.length,
+               s_el->mos.width);
+
+        if (!buf)
+            return NULL;
+        if (*buf != '\n') {
+            printf("error: invalid character '%c' after value - exit.\n",*buf);
+            exit(EXIT_FAILURE);
+        }
+
+        break;
+    }
     default:
         printf("Unknown element type '%c' - exit.\n",type);
         exit(EXIT_FAILURE);
@@ -401,6 +638,10 @@ char *parse_comment(char *buf) {
     return buf;
 }
 
+static inline int command_is(char *command, char *type) {
+    return (strcmp(command,type) == 0);
+}
+
 char *parse_command(char *buf) {
     //printf("in function: %s\n",__FUNCTION__);
 
@@ -413,7 +654,9 @@ char *parse_command(char *buf) {
     char *name;
     buf = parse_string(buf,&name);
 
-    if (strcmp(name,""))
+    if (command_is(name,"")) {
+
+    }
 
 #else
     printf("***  WARNING  ***    command parsing is not implemented yet! - skip command\n");

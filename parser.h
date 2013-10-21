@@ -1,6 +1,8 @@
 #ifndef __CAPER_PARSER_H__
 #define __CAPER_PARSER_H__
 
+#define DEFAULT_BJT_AREA 1
+
 struct fileinfo {
     char *name;
     char *raw_begin;
@@ -23,17 +25,46 @@ struct _source_ {
     struct node vminus;
 };
 
+enum nonlinear_model_type {
+    MODEL_BJT_NONE,
+    MODEL_MOS_NOME,
+    MODEL_DIODE_NONE
+};
+
+struct nonlinear_model {
+    char *name;
+    enum nonlinear_model_type type;
+};
+
 struct _mos_ {
     struct node s;
     struct node d;
     struct node g;
     struct node b;
+    struct nonlinear_model model;
+    union {
+        double l;
+        double length;
+    };
+    union {
+        double w;
+        double width;
+    };
 };
 
 struct _bjt_ {
     struct node c;
     struct node e;
     struct node b;
+    struct nonlinear_model model;
+    double area;
+};
+
+struct _diode_ {
+    struct node vplus;
+    struct node vminus;
+    struct nonlinear_model model;
+    double area;
 };
 
 struct element {
@@ -56,6 +87,7 @@ struct element {
 
         struct _mos_ mos;
         struct _bjt_ bjt;
+        struct _diode_ diode;
     };
 };
 
