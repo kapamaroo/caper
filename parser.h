@@ -2,6 +2,9 @@
 #define __CAPER_PARSER_H__
 
 #define DEFAULT_BJT_AREA 1
+#define DEFAULT_DIODE_AREA 1
+
+#define SEMANTIC_ERRORS -2
 
 struct fileinfo {
     char *name;
@@ -13,16 +16,18 @@ struct fileinfo {
 struct node {
     unsigned long nuid;
     char *name;
+    double value;
+    unsigned long refs;
 };
 
 struct _passive_ {
-    struct node vplus;
-    struct node vminus;
+    struct node *vplus;
+    struct node *vminus;
 };
 
 struct _source_ {
-    struct node vplus;
-    struct node vminus;
+    struct node *vplus;
+    struct node *vminus;
 };
 
 enum nonlinear_model_type {
@@ -37,10 +42,10 @@ struct nonlinear_model {
 };
 
 struct _mos_ {
-    struct node s;
-    struct node d;
-    struct node g;
-    struct node b;
+    struct node *s;
+    struct node *d;
+    struct node *g;
+    struct node *b;
     struct nonlinear_model model;
     union {
         double l;
@@ -53,16 +58,16 @@ struct _mos_ {
 };
 
 struct _bjt_ {
-    struct node c;
-    struct node e;
-    struct node b;
+    struct node *c;
+    struct node *e;
+    struct node *b;
     struct nonlinear_model model;
     double area;
 };
 
 struct _diode_ {
-    struct node vplus;
-    struct node vminus;
+    struct node *vplus;
+    struct node *vminus;
     struct nonlinear_model model;
     double area;
 };
@@ -95,7 +100,12 @@ void parser_init();
 
 int parse_file(const char *filename);
 
-struct node **get_node_pool();
+void print_element(struct element *_el);
+void print_elements();
+void print_node(struct node *_node);
+void print_nodes();
+
+struct node *get_node_pool();
 struct element *get_element_pool();
 
 #endif
