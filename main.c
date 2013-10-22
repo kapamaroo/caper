@@ -12,6 +12,7 @@ void about() {
 }
 
 void handle_file(char *filename) {
+    parser_init();
     int status = parse_file(filename);
     print_elements();
     print_nodes();
@@ -23,8 +24,6 @@ void handle_file(char *filename) {
 
 int main(int argc, char *argv[]) {
     int i;
-
-    parser_init();
     for (i=1; i<argc; ++i) {
         handle_file(argv[i]);
     }
