@@ -31,6 +31,34 @@ unsigned long node_pool_size = 128;
 unsigned long node_pool_next = 1;  //reserve the first node to be the ground node
 struct node *node_pool;
 
+void grow(void **pool,unsigned long size, unsigned long element_size,
+          unsigned long next) {
+#if 1
+    printf("error: grow does not work - exit.\n");
+    return;
+    exit(EXIT_FAILURE);
+#endif
+
+    printf("in function: %s\n",__FUNCTION__);
+
+    if (next == size) {
+        if (size == ULONG_MAX) {
+            printf("Out of memory: reached pool limit - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        else if (size > ULONG_MAX >> 1)
+            size = ULONG_MAX;
+        else
+            size <<= 1;
+        void *new_pool = (void *)realloc(*pool,size * element_size);
+        if (!new_pool) {
+            printf("Out of memory: realloc failed - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        *pool = new_pool;
+    }
+}
+
 static inline int is_invalid_node_name(char *s) {
     if (s[0] != '-')
         return 0;
@@ -64,7 +92,7 @@ static inline struct node *parse_node(char **buf, char *info) {
     _n->refs = 1;
 
     /* check if we need to resize the pool */
-    //grow((void**)&node_pool,node_pool_size,sizeof(struct node*),node_pool_next);
+    grow((void**)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
 
     return _n;
 }
@@ -77,7 +105,7 @@ static inline struct element *get_new_element(char type) {
     //we get the name later
 
     /* check if we need to resize the pool */
-    //grow((void**)&el_pool,el_pool_size,sizeof(struct element),el_pool_next);
+    grow((void**)&el_pool,el_pool_size,sizeof(struct element),el_pool_next);
 
     return el;
 }
@@ -87,7 +115,7 @@ void print_element(struct element *_el) {
     switch (_el->type) {
     case 'v':
     case 'i':
-        printf("%s %s %s %+8.4f\n",
+        printf("%s %s %s %+e\n",
                _el->name,
                _el->_vi.vplus->name,
                _el->_vi.vminus->name,
@@ -96,14 +124,14 @@ void print_element(struct element *_el) {
     case 'r':
     case 'l':
     case 'c':
-        printf("%s %s %s %+8.4f\n",
+        printf("%s %s %s %e\n",
                _el->name,
                _el->_rcl.vplus->name,
                _el->_rcl.vminus->name,
                _el->value);
         break;
     case 'q':
-        printf("%s %s %s %s %s %f\n",
+        printf("%s %s %s %s %s %e\n",
                _el->name,
                _el->bjt.c->name,
                _el->bjt.b->name,
@@ -112,7 +140,7 @@ void print_element(struct element *_el) {
                _el->bjt.area);
         break;
     case 'm':
-        printf("%s %s %s %s %s %s %f %f",
+        printf("%s %s %s %s %s %s L=%e W=%e",
                _el->name,
                _el->mos.d->name,
                _el->mos.g->name,
@@ -123,7 +151,7 @@ void print_element(struct element *_el) {
                _el->mos.width);
         break;
     case 'd':
-        printf("%s %s %s %s %+8.4f\n",
+        printf("%s %s %s %s %+e\n",
                _el->name,
                _el->diode.vplus->name,
                _el->diode.vminus->name,
@@ -343,7 +371,7 @@ char *parse_string(char **buf, char *info) {
     return name;
 }
 
-double parse_value(char **buf, char *info) {
+double parse_value(char **buf, char *prefix, char *info) {
     //printf("in function: %s\n",__FUNCTION__);
 
     if (!*buf || isspace(**buf)) {
@@ -351,8 +379,25 @@ double parse_value(char **buf, char *info) {
         exit(EXIT_FAILURE);
     }
 
+    if (prefix) {
+        int i;
+        int size = strlen(prefix);
+        for (i=0; i<size; ++i) {
+            char c = tolower(**buf);
+            char p = tolower(prefix[i]);
+            if (c != p) {
+                printf("error: expected prefix '%s' before value - exit\n",prefix);
+                exit(EXIT_FAILURE);
+            }
+            (*buf)++;
+        }
+    }
+
     char *end = current_input->raw_end;
     errno = 0;
+
+#if 0
+#error bug bug bug!!!
     char *endptr = *buf;
     double value = strtod(*buf,&endptr);
     if (errno) {
@@ -364,54 +409,47 @@ double parse_value(char **buf, char *info) {
         exit(EXIT_FAILURE);
     }
     *buf = endptr;
+#else
+    double value;
+    int status = sscanf(*buf,"%lf",&value);
+    if (status == EOF) {
+        printf("error: sscanf() early fail\n");
+        exit(EXIT_FAILURE);
+    }
+    if (errno) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    while (*buf != end) {
+        if (isspace(**buf))
+            break;
+        (*buf)++;
+    }
+
+#endif
+
     if (*buf == end)
         *buf = NULL;
     if (*buf && !isspace(**buf)) {
-        printf("error: invalid character '%c' after value - exit.\n",**buf);
+        printf("error: invalid character '%c' after value %lf - exit.\n",**buf,value);
         exit(EXIT_FAILURE);
     }
 
     parse_eat_whitechars(buf);
 
-    //printf("debug: value=%f\n",*value);
+    //printf("debug: value=%lf\n",*value);
 
     return value;
 }
 
-double parse_value_optional(char **buf, double default_value) {
+double parse_value_optional(char **buf, char *prefix, double default_value) {
     //printf("in function: %s\n",__FUNCTION__);
 
     if (!*buf || isspace(**buf))
         return default_value;
     else
-        return parse_value(buf,"value");
-}
-
-void grow(void **pool,unsigned long size, unsigned long element_size,
-          unsigned long next) {
-#if 1
-    printf("error: grow does not work - exit.\n");
-    exit(EXIT_FAILURE);
-#endif
-
-    printf("in function: %s\n",__FUNCTION__);
-
-    if (next == size) {
-        if (size == ULONG_MAX) {
-            printf("Out of memory: reached pool limit - exit.\n");
-            exit(EXIT_FAILURE);
-        }
-        else if (size > ULONG_MAX >> 1)
-            size = ULONG_MAX;
-        else
-            size <<= 1;
-        void *new_pool = (void *)realloc(*pool,size * element_size);
-        if (!new_pool) {
-            printf("Out of memory: realloc failed - exit.\n");
-            exit(EXIT_FAILURE);
-        }
-        *pool = new_pool;
-    }
+        return parse_value(buf,prefix,"value");
 }
 
 void parse_element(char **buf) {
@@ -426,7 +464,7 @@ void parse_element(char **buf) {
         s_el->name = parse_string(buf,"voltage/current source name");
         s_el->_vi.vplus = parse_node(buf,"voltage/current '+' node");
         s_el->_vi.vminus = parse_node(buf,"voltage/current '-' node");
-        s_el->value = parse_value(buf,"voltage/current value");
+        s_el->value = parse_value(buf,NULL,"voltage/current value");
         break;
     }
     case 'r':
@@ -435,7 +473,7 @@ void parse_element(char **buf) {
         s_el->name = parse_string(buf,"rlc element name");
         s_el->_rcl.vplus = parse_node(buf,"rcl '+' node");
         s_el->_rcl.vminus = parse_node(buf,"rcl '-' node");
-        s_el->value = parse_value(buf,"rcl value");
+        s_el->value = parse_value(buf,NULL,"rcl value");
         break;
     }
     case 'q': {
@@ -444,7 +482,7 @@ void parse_element(char **buf) {
         s_el->bjt.b = parse_node(buf,"bjt b node");
         s_el->bjt.e = parse_node(buf,"bjt e node");
         s_el->bjt.model.name = parse_string(buf,"bjt model name");
-        s_el->bjt.area = parse_value_optional(buf,DEFAULT_BJT_AREA);
+        s_el->bjt.area = parse_value_optional(buf,NULL,DEFAULT_BJT_AREA);
         break;
     }
     case 'm': {
@@ -454,8 +492,8 @@ void parse_element(char **buf) {
         s_el->mos.s = parse_node(buf,"mos s node");
         s_el->mos.b = parse_node(buf,"mos b node");
         s_el->mos.model.name = parse_string(buf,"mos model name");
-        s_el->mos.l = parse_value(buf,"mos length value");
-        s_el->mos.w = parse_value(buf,"mos width value");
+        s_el->mos.l = parse_value(buf,"l=","mos length value");
+        s_el->mos.w = parse_value(buf,"w=","mos width value");
         break;
     }
     case 'd': {
@@ -463,7 +501,7 @@ void parse_element(char **buf) {
         s_el->diode.vplus = parse_node(buf,"diode '+' node");
         s_el->diode.vminus = parse_node(buf,"diode '-' node");
         s_el->diode.model.name = parse_string(buf,"diode model name");
-        s_el->diode.area = parse_value_optional(buf,DEFAULT_DIODE_AREA);
+        s_el->diode.area = parse_value_optional(buf,NULL,DEFAULT_DIODE_AREA);
         break;
     }
     default:

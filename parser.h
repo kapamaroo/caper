@@ -13,11 +13,21 @@ struct fileinfo {
     size_t size;
 };
 
-struct node {
-    unsigned long nuid;
+struct raw_node {
     char *name;
     double value;
     unsigned long refs;
+};
+
+struct node {
+    unsigned long nuid;
+#if 0
+    struct raw_node _node;
+#else
+    char *name;
+    double value;
+    unsigned long refs;
+#endif
 };
 
 struct _passive_ {
