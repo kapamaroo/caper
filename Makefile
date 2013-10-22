@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -I.
+CFLAGS=-Wall -g -I.
 DEPS = parser.h
 OBJ = main.o parser.o
 
