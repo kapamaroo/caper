@@ -20,6 +20,7 @@ void handle_file(char *filename) {
         printf("\nError: input file '%s' is not well defined - exit.\n\n",filename);
         exit(EXIT_FAILURE);
     }
+    parser_clean();
 }
 
 int main(int argc, char *argv[]) {

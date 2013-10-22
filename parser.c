@@ -187,11 +187,15 @@ void print_nodes() {
 
 void parser_init() {
     current_input = NULL;
+
+    assert(!el_pool);
     el_pool = (struct element *)malloc(el_pool_size * sizeof(struct element));
     if (!el_pool) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+
+    assert(!node_pool);
     node_pool = (struct node *)malloc(node_pool_size * sizeof(struct node));
     if (!node_pool) {
         perror(__FUNCTION__);
@@ -204,6 +208,30 @@ void parser_init() {
     ground->nuid = 0;
     ground->value = 0;
     ground->refs = 0;
+}
+
+void parser_clean() {
+    int i;
+
+    assert(el_pool);
+    for (i=0; i<el_pool_next; ++i) {
+        struct element *_el = &el_pool[i];
+        free(_el->name);
+    }
+    free(el_pool);
+    el_pool = NULL;
+    el_pool_size = 128;
+    el_pool_next = 0;
+
+    assert(node_pool);
+    for (i=1; i<node_pool_next; ++i) {
+        struct node *_n = &node_pool[i];
+        free(_n->name);
+    }
+    free(node_pool);
+    node_pool = NULL;
+    node_pool_size = 128;
+    node_pool_next = 1;  //reserve the first node to be the ground node
 }
 
 int is_semantically_correct() {
@@ -455,6 +483,7 @@ double parse_value_optional(char **buf, char *prefix, double default_value) {
 void parse_element(char **buf) {
     //printf("in function: %s\n",__FUNCTION__);
 
+    assert(*buf);
     char type = tolower(**buf);
     struct element *s_el = get_new_element(type);
 
