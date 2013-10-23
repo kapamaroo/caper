@@ -21,21 +21,23 @@ void parse_command(char **buf);
 
 char *parse_string(char **buf, char *info);
 
-struct fileinfo *current_input;
+struct fileinfo *current_input = NULL;
 
-#define INIT_EL_POOL_SIZE 128
-#define INIT_NODE_POOL_SIZE 128
+#define INIT_EL_POOL_SIZE 1
+#define INIT_NODE_POOL_SIZE 1
 
 #if INIT_NODE_POOL_SIZE < 1
 #error node pool size must be at least 1
 #endif
 
-unsigned long el_pool_size = INIT_EL_POOL_SIZE;
-unsigned long el_pool_next = 0;
+static unsigned long __euid__ = 0;
+static unsigned long el_pool_size = INIT_EL_POOL_SIZE;
+static unsigned long el_pool_next = 0;
 struct element *el_pool = NULL;
 
-unsigned long node_pool_size = INIT_NODE_POOL_SIZE;
-unsigned long node_pool_next = 1;  //reserve the first node to be the ground node
+static unsigned long __nuid__ = 1;  //zero goes to ground node
+static unsigned long node_pool_size = INIT_NODE_POOL_SIZE;
+static unsigned long node_pool_next = 1;  //reserve the first node to be the ground node
 struct node *node_pool = NULL;
 
 static inline void rebuild() {
@@ -115,7 +117,6 @@ static inline int is_invalid_node_name(char *s) {
     return 1;
 }
 
-static unsigned long __nuid__ = 1;  //zero goes to ground node
 static inline struct container_node parse_node(char **buf, char *info) {
     char *name = parse_string(buf,info);
     if (is_invalid_node_name(name))
@@ -147,7 +148,6 @@ static inline struct container_node parse_node(char **buf, char *info) {
     return container;
 }
 
-static unsigned long __euid__ = 0;
 static inline struct element *get_new_element(char type) {
     /* check if we need to resize the pool */
     grow((void**)&el_pool,&el_pool_size,sizeof(struct element),el_pool_next);
@@ -155,7 +155,7 @@ static inline struct element *get_new_element(char type) {
     struct element *el = &el_pool[el_pool_next++];
     el->type = type;
     el->euid = __euid__++;
-    //we get the name later
+    el->name = NULL;  //we get the name later
 
     return el;
 }
@@ -236,20 +236,38 @@ void print_nodes() {
 }
 
 void parser_init() {
-    current_input = NULL;
+    if (el_pool) {
+        int i;
+        for (i=0; i<el_pool_next; ++i) {
+            struct element *_el = &el_pool[i];
+            free(_el->name);
+        }
+        free(el_pool);
+        el_pool = NULL;
+    }
 
+    if (node_pool) {
+        int i;
+        for (i=1; i<node_pool_next; ++i) {
+            struct node *_n = &node_pool[i];
+            free(_n->name);
+        }
+        free(node_pool);
+        node_pool = NULL;
+    }
+
+    __euid__ = 0;
     el_pool_size = INIT_EL_POOL_SIZE;
     el_pool_next = 0;
-    assert(!el_pool);
     el_pool = (struct element *)malloc(el_pool_size * sizeof(struct element));
     if (!el_pool) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
 
+    __nuid__ = 1;
     node_pool_size = INIT_NODE_POOL_SIZE;
     node_pool_next = 1;  //reserve the first node to be the ground node
-    assert(!node_pool);
     node_pool = (struct node *)malloc(node_pool_size * sizeof(struct node));
     if (!node_pool) {
         perror(__FUNCTION__);
@@ -262,26 +280,6 @@ void parser_init() {
     ground->nuid = 0;
     ground->value = 0;
     ground->refs = 0;
-}
-
-void parser_clean() {
-    int i;
-
-    assert(el_pool);
-    for (i=0; i<el_pool_next; ++i) {
-        struct element *_el = &el_pool[i];
-        free(_el->name);
-    }
-    free(el_pool);
-    el_pool = NULL;
-
-    assert(node_pool);
-    for (i=1; i<node_pool_next; ++i) {
-        struct node *_n = &node_pool[i];
-        free(_n->name);
-    }
-    free(node_pool);
-    node_pool = NULL;
 }
 
 int is_semantically_correct() {
@@ -336,24 +334,26 @@ struct fileinfo *open_file(const char *filename) {
     return finfo;
 }
 
-void close_file(struct fileinfo *finfo) {
-    int error = munmap(finfo->raw_begin,finfo->size);
+void close_file(struct fileinfo **finfo) {
+    int error = munmap((*finfo)->raw_begin,(*finfo)->size);
     if (error) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-    free(finfo);
-    finfo = NULL;
+    free(*finfo);
+    *finfo = NULL;
 }
 
 int parse_file(const char *filename) {
+    parser_init();
+    assert(!current_input);
     current_input = open_file(filename);
 
     char *ptr;
     for (ptr = current_input->raw_begin; ptr; )
         parse_line(&ptr);
 
-    close_file(current_input);
+    close_file(&current_input);
 
     if (is_semantically_correct())
         return 0;

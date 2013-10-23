@@ -101,9 +101,6 @@ struct element {
     };
 };
 
-void parser_init();
-void parser_clean();
-
 int parse_file(const char *filename);
 
 void print_element(struct element *_el);
