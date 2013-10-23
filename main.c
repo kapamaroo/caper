@@ -12,14 +12,19 @@ void about() {
 }
 
 void handle_file(char *filename) {
+    printf("\n=================    File name: '%s    =================\n",filename);
     parser_init();
     int status = parse_file(filename);
-    print_elements();
-    print_nodes();
     if (status == SEMANTIC_ERRORS) {
         printf("\nError: input file '%s' is not well defined - exit.\n\n",filename);
-        exit(EXIT_FAILURE);
+        //print_elements();
+        //print_nodes();
+        parser_clean();
+        return;
     }
+
+    print_elements();
+    print_nodes();
     parser_clean();
 }
 
