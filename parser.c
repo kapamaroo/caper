@@ -23,8 +23,8 @@ char *parse_string(char **buf, char *info);
 
 struct fileinfo *current_input;
 
-#define INIT_EL_POOL_SIZE 1
-#define INIT_NODE_POOL_SIZE 1
+#define INIT_EL_POOL_SIZE 128
+#define INIT_NODE_POOL_SIZE 128
 
 #if INIT_NODE_POOL_SIZE < 1
 #error node pool size must be at least 1
