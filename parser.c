@@ -23,39 +23,85 @@ char *parse_string(char **buf, char *info);
 
 struct fileinfo *current_input;
 
-unsigned long el_pool_size = 128;
+#define INIT_EL_POOL_SIZE 1
+#define INIT_NODE_POOL_SIZE 1
+
+#if INIT_NODE_POOL_SIZE < 1
+#error node pool size must be at least 1
+#endif
+
+unsigned long el_pool_size = INIT_EL_POOL_SIZE;
 unsigned long el_pool_next = 0;
-struct element *el_pool;
+struct element *el_pool = NULL;
 
-unsigned long node_pool_size = 128;
+unsigned long node_pool_size = INIT_NODE_POOL_SIZE;
 unsigned long node_pool_next = 1;  //reserve the first node to be the ground node
-struct node *node_pool;
+struct node *node_pool = NULL;
 
-void grow(void **pool,unsigned long size, unsigned long element_size,
-          unsigned long next) {
-#if 1
+static inline void rebuild() {
+    int i;
+    for (i=0; i<el_pool_next; ++i) {
+        struct element *_el = &el_pool[i];
+        switch (_el->type) {
+        case 'v':
+        case 'i':
+            _el->_vi.vplus._node = &node_pool[_el->_vi.vplus.nuid];
+            _el->_vi.vminus._node = &node_pool[_el->_vi.vminus.nuid];
+            break;
+        case 'r':
+        case 'c':
+        case 'l':
+            _el->_rcl.vplus._node = &node_pool[_el->_rcl.vplus.nuid];
+            _el->_rcl.vminus._node = &node_pool[_el->_rcl.vminus.nuid];
+            break;
+        case 'q':
+            _el->bjt.c._node = &node_pool[_el->bjt.c.nuid];
+            _el->bjt.e._node = &node_pool[_el->bjt.e.nuid];
+            _el->bjt.b._node = &node_pool[_el->bjt.b.nuid];
+            break;
+        case 'm':
+            _el->mos.s._node = &node_pool[_el->mos.s.nuid];
+            _el->mos.d._node = &node_pool[_el->mos.d.nuid];
+            _el->mos.g._node = &node_pool[_el->mos.g.nuid];
+            _el->mos.b._node = &node_pool[_el->mos.b.nuid];
+            break;
+        case 'd':
+            _el->diode.vplus._node = &node_pool[_el->diode.vplus.nuid];
+            _el->diode.vminus._node = &node_pool[_el->diode.vminus.nuid];
+            break;
+        default:
+            printf("Unknown element type '%c' - exit.\n",_el->type);
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+static inline void grow(void **pool,unsigned long *size, unsigned long element_size,
+                        unsigned long next) {
+#if 0
     printf("error: grow does not work - exit.\n");
     return;
     exit(EXIT_FAILURE);
 #endif
 
-    printf("in function: %s\n",__FUNCTION__);
+    //printf("in function: %s\n",__FUNCTION__);
 
-    if (next == size) {
-        if (size == ULONG_MAX) {
+    if (next == *size) {
+        if (*size == ULONG_MAX) {
             printf("Out of memory: reached pool limit - exit.\n");
             exit(EXIT_FAILURE);
         }
-        else if (size > ULONG_MAX >> 1)
-            size = ULONG_MAX;
+        else if (*size > ULONG_MAX >> 1)
+            *size = ULONG_MAX;
         else
-            size <<= 1;
-        void *new_pool = (void *)realloc(*pool,size * element_size);
+            *size <<= 1;
+        void *new_pool = (void *)realloc(*pool,*size * element_size);
         if (!new_pool) {
             printf("Out of memory: realloc failed - exit.\n");
             exit(EXIT_FAILURE);
         }
         *pool = new_pool;
+        rebuild();
     }
 }
 
@@ -70,42 +116,46 @@ static inline int is_invalid_node_name(char *s) {
 }
 
 static unsigned long __nuid__ = 1;  //zero goes to ground node
-static inline struct node *parse_node(char **buf, char *info) {
+static inline struct container_node parse_node(char **buf, char *info) {
     char *name = parse_string(buf,info);
     if (is_invalid_node_name(name))
         exit(EXIT_FAILURE);
 
     int i;
     for (i=0; i<node_pool_next; ++i) {
-        struct node *_n = &node_pool[i];
-        if (strcmp(_n->name,name) == 0) {
+        struct node *_node = &node_pool[i];
+        if (strcmp(_node->name,name) == 0) {
             free(name);
-            _n->refs++;
-            return _n;
+            _node->refs++;
+            unsigned long _nuid = _node->nuid;
+            struct container_node container = { .nuid=_nuid, ._node=_node };
+            return container;
         }
     }
 
-    struct node *_n = &node_pool[node_pool_next++];
-    _n->name = name;
-    _n->nuid = __nuid__++;
-    _n->value = 0;
-    _n->refs = 1;
-
     /* check if we need to resize the pool */
-    grow((void**)&node_pool,node_pool_size,sizeof(struct node),node_pool_next);
+    grow((void**)&node_pool,&node_pool_size,sizeof(struct node),node_pool_next);
 
-    return _n;
+    struct node *_node = &node_pool[node_pool_next++];
+    unsigned long _nuid = __nuid__++;
+    _node->nuid = _nuid;
+    _node->name = name;
+    _node->value = 0;
+    _node->refs = 1;
+
+    struct container_node container = { .nuid=_nuid, ._node=_node };
+    return container;
 }
 
 static unsigned long __euid__ = 0;
 static inline struct element *get_new_element(char type) {
+    /* check if we need to resize the pool */
+    grow((void**)&el_pool,&el_pool_size,sizeof(struct element),el_pool_next);
+
     struct element *el = &el_pool[el_pool_next++];
     el->type = type;
     el->euid = __euid__++;
     //we get the name later
-
-    /* check if we need to resize the pool */
-    grow((void**)&el_pool,el_pool_size,sizeof(struct element),el_pool_next);
 
     return el;
 }
@@ -117,8 +167,8 @@ void print_element(struct element *_el) {
     case 'i':
         printf("%s %s %s %+e\n",
                _el->name,
-               _el->_vi.vplus->name,
-               _el->_vi.vminus->name,
+               _el->_vi.vplus._node->name,
+               _el->_vi.vminus._node->name,
                _el->value);
         break;
     case 'r':
@@ -126,26 +176,26 @@ void print_element(struct element *_el) {
     case 'c':
         printf("%s %s %s %e\n",
                _el->name,
-               _el->_rcl.vplus->name,
-               _el->_rcl.vminus->name,
+               _el->_rcl.vplus._node->name,
+               _el->_rcl.vminus._node->name,
                _el->value);
         break;
     case 'q':
         printf("%s %s %s %s %s %e\n",
                _el->name,
-               _el->bjt.c->name,
-               _el->bjt.b->name,
-               _el->bjt.e->name,
+               _el->bjt.c._node->name,
+               _el->bjt.b._node->name,
+               _el->bjt.e._node->name,
                _el->bjt.model.name,
                _el->bjt.area);
         break;
     case 'm':
         printf("%s %s %s %s %s %s L=%e W=%e",
                _el->name,
-               _el->mos.d->name,
-               _el->mos.g->name,
-               _el->mos.s->name,
-               _el->mos.b->name,
+               _el->mos.d._node->name,
+               _el->mos.g._node->name,
+               _el->mos.s._node->name,
+               _el->mos.b._node->name,
                _el->mos.model.name,
                _el->mos.length,
                _el->mos.width);
@@ -153,8 +203,8 @@ void print_element(struct element *_el) {
     case 'd':
         printf("%s %s %s %s %+e\n",
                _el->name,
-               _el->diode.vplus->name,
-               _el->diode.vminus->name,
+               _el->diode.vplus._node->name,
+               _el->diode.vminus._node->name,
                _el->diode.model.name,
                _el->value);
         break;
@@ -188,6 +238,8 @@ void print_nodes() {
 void parser_init() {
     current_input = NULL;
 
+    el_pool_size = INIT_EL_POOL_SIZE;
+    el_pool_next = 0;
     assert(!el_pool);
     el_pool = (struct element *)malloc(el_pool_size * sizeof(struct element));
     if (!el_pool) {
@@ -195,6 +247,8 @@ void parser_init() {
         exit(EXIT_FAILURE);
     }
 
+    node_pool_size = INIT_NODE_POOL_SIZE;
+    node_pool_next = 1;  //reserve the first node to be the ground node
     assert(!node_pool);
     node_pool = (struct node *)malloc(node_pool_size * sizeof(struct node));
     if (!node_pool) {
@@ -220,8 +274,6 @@ void parser_clean() {
     }
     free(el_pool);
     el_pool = NULL;
-    el_pool_size = 128;
-    el_pool_next = 0;
 
     assert(node_pool);
     for (i=1; i<node_pool_next; ++i) {
@@ -230,8 +282,6 @@ void parser_clean() {
     }
     free(node_pool);
     node_pool = NULL;
-    node_pool_size = 128;
-    node_pool_next = 1;  //reserve the first node to be the ground node
 }
 
 int is_semantically_correct() {
@@ -383,13 +433,15 @@ char *parse_string(char **buf, char *info) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-    name = memcpy(name,start,size);
+    name = strncpy(name,start,size);
     name[size] = '\0';
 
     //convert to lowercase
     int i;
     for (i=0; i<size; ++i)
         name[i] = tolower(name[i]);
+
+    //printf("debug: new string : %s\n",name);
 
     parse_eat_whitechars(buf);
 

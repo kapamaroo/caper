@@ -13,31 +13,26 @@ struct fileinfo {
     size_t size;
 };
 
-struct raw_node {
+struct node {
+    unsigned long nuid;
     char *name;
     double value;
     unsigned long refs;
 };
 
-struct node {
+struct container_node {
     unsigned long nuid;
-#if 0
-    struct raw_node _node;
-#else
-    char *name;
-    double value;
-    unsigned long refs;
-#endif
+    struct node *_node;
 };
 
 struct _passive_ {
-    struct node *vplus;
-    struct node *vminus;
+    struct container_node vplus;
+    struct container_node vminus;
 };
 
 struct _source_ {
-    struct node *vplus;
-    struct node *vminus;
+    struct container_node vplus;
+    struct container_node vminus;
 };
 
 enum nonlinear_model_type {
@@ -52,10 +47,10 @@ struct nonlinear_model {
 };
 
 struct _mos_ {
-    struct node *s;
-    struct node *d;
-    struct node *g;
-    struct node *b;
+    struct container_node s;
+    struct container_node d;
+    struct container_node g;
+    struct container_node b;
     struct nonlinear_model model;
     union {
         double l;
@@ -68,16 +63,16 @@ struct _mos_ {
 };
 
 struct _bjt_ {
-    struct node *c;
-    struct node *e;
-    struct node *b;
+    struct container_node c;
+    struct container_node e;
+    struct container_node b;
     struct nonlinear_model model;
     double area;
 };
 
 struct _diode_ {
-    struct node *vplus;
-    struct node *vminus;
+    struct container_node vplus;
+    struct container_node vminus;
     struct nonlinear_model model;
     double area;
 };
