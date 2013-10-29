@@ -89,4 +89,12 @@ struct element {
     };
 };
 
+struct netlist_info {
+    int error;
+    unsigned long node_size;
+    unsigned long el_size;
+    struct node *node_pool;
+    struct element *el_pool;
+};
+
 #endif

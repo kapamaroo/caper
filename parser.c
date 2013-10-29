@@ -21,7 +21,14 @@ void parse_command(char **buf);
 
 char *parse_string(char **buf, char *info);
 
-struct fileinfo *current_input = NULL;
+struct file_info {
+    char *name;
+    char *raw_begin;
+    char *raw_end;
+    size_t size;
+};
+
+struct file_info *current_input = NULL;
 
 #define INIT_EL_POOL_SIZE 1
 #define INIT_NODE_POOL_SIZE 1
@@ -214,11 +221,11 @@ void print_element(struct element *_el) {
     }
 }
 
-void print_elements() {
+void print_elements(unsigned long size, struct element el_pool[size]) {
     printf("\n\n***    Circuit Elements    ***\n\n");
 
-    int i;
-    for (i=0; i<el_pool_next; ++i)
+    unsigned int i;
+    for (i=0; i<size; ++i)
         print_element(&el_pool[i]);
 }
 
@@ -227,11 +234,11 @@ void print_node(struct node *n) {
     printf("nuid (%lu): node %s connects %lu elements\n",n->nuid,n->name,n->refs);
 }
 
-void print_nodes() {
+void print_nodes(unsigned long size, struct node node_pool[size]) {
     printf("\n\n***    Circuit Nodes    ***\n\n");
 
-    int i;
-    for (i=0; i<node_pool_next; ++i)
+    unsigned int i;
+    for (i=0; i<size; ++i)
         print_node(&node_pool[i]);
 }
 
@@ -286,14 +293,14 @@ int is_semantically_correct() {
     struct node *ground = &node_pool[0];
     if (ground->refs == 0) {
         printf("error: missing ground node\n");
-        return 0;
+        return SEMANTIC_ERRORS;
     }
-    return 1;
+    return 0;
 }
 
-struct fileinfo *open_file(const char *filename) {
-    struct fileinfo *finfo;
-    finfo = (struct fileinfo *)malloc(sizeof(struct fileinfo));
+struct file_info *open_file(const char *filename) {
+    struct file_info *finfo;
+    finfo = (struct file_info *)malloc(sizeof(struct file_info));
     if (!finfo) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -334,7 +341,7 @@ struct fileinfo *open_file(const char *filename) {
     return finfo;
 }
 
-void close_file(struct fileinfo **finfo) {
+void close_file(struct file_info **finfo) {
     int error = munmap((*finfo)->raw_begin,(*finfo)->size);
     if (error) {
         perror(__FUNCTION__);
@@ -344,7 +351,7 @@ void close_file(struct fileinfo **finfo) {
     *finfo = NULL;
 }
 
-int parse_file(const char *filename) {
+void parse_file(const char *filename, struct netlist_info *netlist) {
     parser_init();
     assert(!current_input);
     current_input = open_file(filename);
@@ -355,9 +362,12 @@ int parse_file(const char *filename) {
 
     close_file(&current_input);
 
-    if (is_semantically_correct())
-        return 0;
-    return SEMANTIC_ERRORS;
+    assert(netlist);
+    netlist->error = is_semantically_correct();
+    netlist->node_size = node_pool_next;
+    netlist->el_size = el_pool_next;
+    netlist->node_pool = node_pool;
+    netlist->el_pool = el_pool;
 }
 
 void parse_eat_whitechars(char **buf) {
@@ -632,14 +642,4 @@ void parse_command(char **buf) {
 #endif
 
     parse_eat_whitechars(buf);
-}
-
-struct node *get_node_pool() {
-    assert(node_pool);
-    return node_pool;
-}
-
-struct element *get_element_pool() {
-    assert(el_pool);
-    return el_pool;
 }

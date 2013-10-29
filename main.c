@@ -13,16 +13,15 @@ void about() {
 
 void handle_file(char *filename) {
     printf("\n================    File name: '%s    ================\n",filename);
-    int status = parse_file(filename);
-    if (status == SEMANTIC_ERRORS) {
+    struct netlist_info netlist;
+    parse_file(filename,&netlist);
+    if (netlist.error) {
         printf("\nError: input file '%s' is not well defined - exit.\n",filename);
-        //print_elements();
-        //print_nodes();
         return;
     }
 
-    print_elements();
-    print_nodes();
+    print_elements(netlist.el_size,netlist.el_pool);
+    print_nodes(netlist.node_size,netlist.node_pool);
 }
 
 int main(int argc, char *argv[]) {

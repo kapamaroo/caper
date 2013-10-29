@@ -8,21 +8,11 @@
 
 #define SEMANTIC_ERRORS -2
 
-struct fileinfo {
-    char *name;
-    char *raw_begin;
-    char *raw_end;
-    size_t size;
-};
-
-int parse_file(const char *filename);
+void parse_file(const char *filename, struct netlist_info *netlist);
 
 void print_element(struct element *_el);
-void print_elements();
+void print_elements(unsigned long size, struct element el_pool[size]);
 void print_node(struct node *_node);
-void print_nodes();
-
-struct node *get_node_pool();
-struct element *get_element_pool();
+void print_nodes(unsigned long size, struct node node_pool[size]);
 
 #endif
