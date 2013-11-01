@@ -54,7 +54,7 @@ static unsigned long node_pool_next = 1;
 struct node *node_pool = NULL;
 
 static inline void rebuild() {
-    unsigned int i;
+    unsigned long i;
     for (i=0; i<el_group1_pool_next; ++i) {
         struct element *_el = &el_group1_pool[i];
         switch (_el->type) {
@@ -151,7 +151,7 @@ static inline struct container_node parse_node(char **buf, char *info) {
     if (is_invalid_node_name(name))
         exit(EXIT_FAILURE);
 
-    unsigned int i;
+    unsigned long i;
     for (i=0; i<node_pool_next; ++i) {
         struct node *_node = &node_pool[i];
         if (strcmp(_node->name,name) == 0) {
@@ -264,7 +264,7 @@ void print_element(struct element *_el) {
 }
 
 void print_elements(unsigned long size, struct element pool[size]) {
-    unsigned int i;
+    unsigned long i;
     for (i=0; i<size; ++i)
         print_element(&pool[i]);
 }
@@ -275,14 +275,14 @@ void print_node(struct node *n) {
 }
 
 void print_nodes(unsigned long size, struct node node_pool[size]) {
-    unsigned int i;
+    unsigned long i;
     for (i=0; i<size; ++i)
         print_node(&node_pool[i]);
 }
 
 void parser_init() {
     if (el_group1_pool) {
-        unsigned int i;
+        unsigned long i;
         for (i=0; i<el_group1_pool_next; ++i) {
             struct element *_el = &el_group1_pool[i];
             free(_el->name);
@@ -292,7 +292,7 @@ void parser_init() {
     }
 
     if (el_group2_pool) {
-        unsigned int i;
+        unsigned long i;
         for (i=0; i<el_group2_pool_next; ++i) {
             struct element *_el = &el_group2_pool[i];
             free(_el->name);
@@ -302,7 +302,7 @@ void parser_init() {
     }
 
     if (node_pool) {
-        unsigned int i;
+        unsigned long i;
         for (i=1; i<node_pool_next; ++i) {
             struct node *_n = &node_pool[i];
             free(_n->name);
