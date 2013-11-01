@@ -102,8 +102,12 @@ struct netlist_info {
         unsigned long e;
     };
 
+    unsigned long el_group1_size;
+    unsigned long el_group2_size;
+
     struct node *node_pool;
-    struct element *el_pool;
+    struct element *el_group1_pool;
+    struct element *el_group2_pool;
 };
 
 #endif

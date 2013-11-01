@@ -3,11 +3,6 @@
 
 #include "datatypes.h"
 
-enum analysis_type {
-    A_KVL,  //Kirchhof's Voltage Law analysis
-    A_KCL,  //Kirchhof's Current Law analysis
-};
-
 struct analysis_info {
     enum analysis_type type;
     int error;
@@ -35,7 +30,8 @@ struct analysis_info {
                 //('el_size' elements)
 };
 
-void analyse(struct netlist_info *netlist, struct analysis_info *analysis,
-             enum analysis_type type);
+void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis);
+void analyse_kcl(struct netlist_info *netlist, struct analysis_info *analysis);
+void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
 
 #endif

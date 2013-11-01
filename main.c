@@ -20,7 +20,10 @@ void handle_file(char *filename) {
         return;
     }
 
-    print_elements(netlist.el_size,netlist.el_pool);
+    printf("\n\n***    Circuit Elements    ***\n\n");
+    print_elements(netlist.el_group1_size,netlist.el_group1_pool);
+    print_elements(netlist.el_group2_size,netlist.el_group2_pool);
+    printf("\n\n***    Circuit Nodes    ***\n\n");
     print_nodes(netlist.node_size,netlist.node_pool);
 }
 
