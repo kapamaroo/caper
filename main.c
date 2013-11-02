@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "parser.h"
+#include "analysis.h"
 
 void help() {
 
@@ -25,6 +26,10 @@ void handle_file(char *filename) {
     print_elements(netlist.el_group2_size,netlist.el_group2_pool);
     printf("\n\n***    Circuit Nodes    ***\n\n");
     print_nodes(netlist.node_size,netlist.node_pool);
+
+    struct analysis_info analysis;
+    analyse_kvl(&netlist,&analysis);
+    print_int_array(analysis.n, analysis.e, analysis.A);
 }
 
 int main(int argc, char *argv[]) {

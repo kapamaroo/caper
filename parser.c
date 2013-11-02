@@ -211,6 +211,7 @@ static inline struct element *get_new_element(char type) {
 
 void print_element(struct element *_el) {
     assert(_el);
+    printf("euid (%3lu) : ",_el->euid);
     switch (_el->type) {
     case 'v':
     case 'i':
