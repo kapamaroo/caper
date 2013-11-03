@@ -28,6 +28,12 @@ struct analysis_info {
     int *A2;
     int *A2t;
 
+    double *G;  //resistance matrix (m1 x m1)
+    double *C;  //capacity matrix (m1 x m1)
+    double *L;  //self inductor matrix  (m2 x m2)
+    double *S1; //group1 current source vector (m1 x 1)
+    double *S2; //group2 voltage source vector (m2 x 1)
+
     double *v;  //node's voltage relative to ground
                 //('node_size' elements)
 

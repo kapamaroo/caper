@@ -195,6 +195,36 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         }
     }
 
+    double *G = (double*)malloc(el_group1_size * el_group1_size * sizeof(double));
+    if (!G) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *C = (double*)malloc(el_group1_size * el_group1_size * sizeof(double));
+    if (!C) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *L = (double*)malloc(el_group2_size * el_group2_size * sizeof(double));
+    if (!L) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *S1 = (double*)malloc(el_group1_size * sizeof(double));
+    if (!S1) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *S2 = (double*)malloc(el_group2_size * sizeof(double));
+    if (!S2) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
     analysis->n = n-1;
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
@@ -205,6 +235,11 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->A1t = A1t;
     analysis->A2 = A2;
     analysis->A2t = A2t;
+    analysis->G = G;
+    analysis->C = C;
+    analysis->L = L;
+    analysis->S1 = S1;
+    analysis->S2 = S2;
     analysis->v = v;
     analysis->u = u;
     analysis->i = i_current;
