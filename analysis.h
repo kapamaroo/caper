@@ -16,8 +16,17 @@ struct analysis_info {
         unsigned long e;
     };
 
+    unsigned long el_group1_size;
+    unsigned long el_group2_size;
+
     int *A;     //nodes x elements array (without the ground node)
     int *At;    //transposed A
+
+    int *A1;
+    int *A1t;
+
+    int *A2;
+    int *A2t;
 
     double *v;  //node's voltage relative to ground
                 //('node_size' elements)

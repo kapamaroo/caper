@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-Wall -g -I.
-DEPS = parser.h datatypes.h
+DEPS = parser.h datatypes.h analysis.h
 OBJ = main.o parser.o analysis.c
 
 %.o: %.c $(DEPS)

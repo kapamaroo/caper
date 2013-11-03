@@ -30,6 +30,13 @@ void handle_file(char *filename) {
     struct analysis_info analysis;
     analyse_kvl(&netlist,&analysis);
     print_int_array(analysis.n, analysis.e, analysis.A);
+
+    printf("***    Transposed A\n");
+    print_int_array(analysis.e,analysis.n,analysis.At);
+    printf("***    A1\n");
+    print_int_array(analysis.n,analysis.el_group1_size,analysis.A1);
+    printf("***    A2\n");
+    print_int_array(analysis.n,analysis.el_group2_size,analysis.A2);
 }
 
 int main(int argc, char *argv[]) {

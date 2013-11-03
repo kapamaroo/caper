@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <errno.h>
 
-void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis) {
+void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
     assert(netlist);
     assert(analysis);
 
@@ -35,17 +35,6 @@ void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-
-    //ignore the transposed matrix for now
-#if 0
-    int *At = NULL;
-#else
-    int *At = (int*)calloc((n-1) * e, sizeof(int));
-    if (!At) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-#endif
 
     unsigned long el_group1_size = netlist->el_group1_size;
     unsigned long el_group2_size = netlist->el_group2_size;
@@ -141,17 +130,99 @@ void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis) {
 #endif
     }
 
+    int *At = (int*)malloc((n-1) * e * sizeof(int));
+    if (!At) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    unsigned long j;
+    for (i=0; i<n-1; ++i) {
+        for (j=0; j<e; ++j) {
+            At[j*(n-1) + i] = A[i*e + j];
+        }
+    }
+
+    //create A1 and A1t
+
+    int *A1 = (int*)malloc((n-1) * el_group1_size * sizeof(int));
+    if (!A1) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    for (i=0; i<n-1; ++i) {
+        for (j=0; j<el_group1_size; ++j) {
+            A1[i*el_group1_size + j] = A[i*e + j];
+        }
+    }
+
+    int *A1t = (int*)malloc((n-1) * el_group1_size * sizeof(int));
+    if (!A1t) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    for (i=0; i<n-1; ++i) {
+        for (j=0; j<el_group1_size; ++j) {
+            A1t[j*(n-1) + i] = A1[i*el_group1_size + j];
+        }
+    }
+
+    //create A1 and A1t
+
+    int *A2 = (int*)malloc((n-1) * el_group2_size * sizeof(int));
+    if (!A2) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    for (i=0; i<n-1; ++i) {
+        for (j=0; j<el_group2_size; ++j) {
+            A2[i*el_group2_size + j] = A[i*e + el_group1_size + j];
+        }
+    }
+
+    int *A2t = (int*)malloc((n-1) * el_group2_size * sizeof(int));
+    if (!A2t) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    for (i=0; i<n-1; ++i) {
+        for (j=0; j<el_group2_size; ++j) {
+            A2t[j*(n-1) + i] = A2[i*el_group2_size + j];
+        }
+    }
+
     analysis->n = n-1;
     analysis->e = e;
+    analysis->el_group1_size = el_group1_size;
+    analysis->el_group2_size = el_group2_size;
     analysis->A = A;
     analysis->At = At;
+    analysis->A1 = A1;
+    analysis->A1t = A1t;
+    analysis->A2 = A2;
+    analysis->A2t = A2t;
     analysis->v = v;
     analysis->u = u;
     analysis->i = i_current;
 }
 
-void analyse_kcl(struct netlist_info *netlist, struct analysis_info *analysis);
-void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
+void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis) {
+    analysis_init(netlist,analysis);
+}
+
+void analyse_kcl(struct netlist_info *netlist, struct analysis_info *analysis) {
+    analysis_init(netlist,analysis);
+
+}
+
+void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
+    analysis_init(netlist,analysis);
+
+}
 
 void print_int_array(unsigned long row, unsigned long col, int *p) {
     unsigned long i;
@@ -162,7 +233,7 @@ void print_int_array(unsigned long row, unsigned long col, int *p) {
     for (j=0; j<col; ++j) {
         printf("%2lu|",j);
     }
-    printf("\n    ___________________________________________\n");
+    printf("\n     ___________________________________________\n");
 
     for (i=0; i<row; ++i) {
         printf("%3lu | ",i + 1);
