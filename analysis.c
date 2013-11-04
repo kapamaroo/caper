@@ -94,7 +94,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
 
-            G[y*el_group1_size + y] = _el->value;
+            G[y*el_group1_size + y] = 1 / _el->value;
 
             break;
         case 'c':
