@@ -37,6 +37,16 @@ void handle_file(char *filename) {
     print_int_array(analysis.n,analysis.el_group1_size,analysis.A1);
     printf("***    A2\n");
     print_int_array(analysis.n,analysis.el_group2_size,analysis.A2);
+    printf("***    G\n");
+    print_double_array(analysis.el_group1_size,analysis.el_group1_size,analysis.G);
+    printf("***    C\n");
+    print_double_array(analysis.el_group1_size,analysis.el_group1_size,analysis.C);
+    printf("***    L\n");
+    print_double_array(analysis.el_group2_size,analysis.el_group2_size,analysis.L);
+    printf("***    S1\n");
+    print_double_array(analysis.el_group1_size,1,analysis.S1);
+    printf("***    S2\n");
+    print_double_array(analysis.el_group2_size,1,analysis.S2);
 }
 
 int main(int argc, char *argv[]) {

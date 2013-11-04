@@ -11,6 +11,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     unsigned long n = netlist->n;
     unsigned long e = netlist->e;
+    unsigned long el_group1_size = netlist->el_group1_size;
+    unsigned long el_group2_size = netlist->el_group2_size;
 
     int *A = (int*)calloc((n-1) * e, sizeof(int));
     if (!A) {
@@ -36,8 +38,35 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    unsigned long el_group1_size = netlist->el_group1_size;
-    unsigned long el_group2_size = netlist->el_group2_size;
+    double *G = (double*)calloc(el_group1_size * el_group1_size, sizeof(double));
+    if (!G) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *C = (double*)calloc(el_group1_size * el_group1_size, sizeof(double));
+    if (!C) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *L = (double*)calloc(el_group2_size * el_group2_size, sizeof(double));
+    if (!L) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *S1 = (double*)calloc(el_group1_size, sizeof(double));
+    if (!S1) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    double *S2 = (double*)calloc(el_group2_size, sizeof(double));
+    if (!S2) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
 
     unsigned long i;
     for (i=0; i<el_group1_size; ++i) {
@@ -53,6 +82,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
+
+            S1[y] = _el->value;
+
             break;
         case 'r':
             xplus = _el->r.vplus.nuid;
@@ -61,6 +93,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
+
+            G[y*el_group1_size + y] = _el->value;
+
             break;
         case 'c':
             xplus = _el->c.vplus.nuid;
@@ -69,6 +104,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
+
+            C[y*el_group1_size + y] = _el->value;
+
             break;
         case 'q':
             printf("warning: ignore bjt elements in analysis for now\n");
@@ -107,6 +145,10 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
+
+            //use i directly, S2 contains only group2 elements
+            S2[i] = _el->value;
+
             break;
         case 'l':
             xplus = _el->l.vplus.nuid;
@@ -115,6 +157,10 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
+
+            //use i directly, L contains only group2 elements
+            L[i*el_group2_size + i] = _el->value;
+
             break;
         default:
             assert(0);
@@ -195,36 +241,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         }
     }
 
-    double *G = (double*)malloc(el_group1_size * el_group1_size * sizeof(double));
-    if (!G) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    double *C = (double*)malloc(el_group1_size * el_group1_size * sizeof(double));
-    if (!C) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    double *L = (double*)malloc(el_group2_size * el_group2_size * sizeof(double));
-    if (!L) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    double *S1 = (double*)malloc(el_group1_size * sizeof(double));
-    if (!S1) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    double *S2 = (double*)malloc(el_group2_size * sizeof(double));
-    if (!S2) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
     analysis->n = n-1;
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
@@ -275,6 +291,27 @@ void print_int_array(unsigned long row, unsigned long col, int *p) {
         for (j=0; j<col; ++j) {
             int val = p[i*col + j];
             printf("% 2d ",val);
+        }
+        printf("\n");
+    }
+}
+
+void print_double_array(unsigned long row, unsigned long col, double *p) {
+    unsigned long i;
+    unsigned long j;
+
+    printf("==============================================\n");
+    printf("      ");
+    for (j=0; j<col; ++j) {
+        printf("%2lu|",j);
+    }
+    printf("\n     ___________________________________________\n");
+
+    for (i=0; i<row; ++i) {
+        printf("%3lu | ",i + 1);
+        for (j=0; j<col; ++j) {
+            double val = p[i*col + j];
+            printf("%2g ",val);
         }
         printf("\n");
     }
