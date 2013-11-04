@@ -593,6 +593,13 @@ double parse_value(char **buf, char *prefix, char *info) {
 
     //printf("debug: value=%lf\n",*value);
 
+#if 0
+    if (value == 0) {
+        printf("error: %s cannot be zero - exit\n",info);
+        exit(EXIT_FAILURE);
+    }
+#endif
+
     return value;
 }
 

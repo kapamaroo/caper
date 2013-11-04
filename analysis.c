@@ -20,11 +20,15 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
+    printf("still alive :)\n");
+
     double *v = (double*)calloc((n-1), sizeof(double));
     if (!v) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+
+    printf("still alive :)\n");
 
     double *u = (double*)calloc(e, sizeof(double));
     if (!u) {
@@ -32,11 +36,15 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
+    printf("still alive :)\n");
+
     double *i_current = (double*)calloc(e, sizeof(double));
     if (!i_current) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+
+    printf("still alive :)\n");
 
     double *G = (double*)calloc(el_group1_size * el_group1_size, sizeof(double));
     if (!G) {
@@ -44,11 +52,15 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
+    printf("still alive :)\n");
+
     double *C = (double*)calloc(el_group1_size * el_group1_size, sizeof(double));
     if (!C) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+
+    printf("still alive :)\n");
 
     double *L = (double*)calloc(el_group2_size * el_group2_size, sizeof(double));
     if (!L) {
@@ -56,17 +68,23 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
+    printf("still alive :)\n");
+
     double *S1 = (double*)calloc(el_group1_size, sizeof(double));
     if (!S1) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
 
+    printf("still alive :)\n");
+
     double *S2 = (double*)calloc(el_group2_size, sizeof(double));
     if (!S2) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+
+    printf("still alive :)\n");
 
     unsigned long i;
     for (i=0; i<el_group1_size; ++i) {
