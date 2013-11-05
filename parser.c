@@ -14,6 +14,9 @@
 
 #include "parser.h"
 
+#define SHOULD_REBUILD 1
+#define NO_REBUILD 0
+
 void parse_line(char **buf);
 void parse_element(char **buf);
 void parse_comment(char **buf);
@@ -107,33 +110,51 @@ static inline void rebuild() {
 }
 
 static inline
-void grow(void **pool,unsigned long *size, unsigned long element_size,
-          unsigned long next) {
-#if 0
-    printf("error: grow does not work - exit.\n");
-    return;
-    exit(EXIT_FAILURE);
-#endif
+unsigned long grow(void **pool,unsigned long size, unsigned long element_size,
+          unsigned long next, const unsigned int should_rebuild) {
+    //returns the new size
 
-    //printf("in function: %s\n",__FUNCTION__);
+    assert(element_size);
 
-    if (next == *size) {
-        if (*size == ULONG_MAX) {
-            printf("Out of memory: reached pool limit - exit.\n");
-            exit(EXIT_FAILURE);
-        }
-        else if (*size > ULONG_MAX >> 1)
-            *size = ULONG_MAX;
-        else
-            *size <<= 1;
-        void *new_pool = (void *)realloc(*pool,*size * element_size);
-        if (!new_pool) {
-            printf("Out of memory: realloc failed - exit.\n");
-            exit(EXIT_FAILURE);
-        }
-        *pool = new_pool;
-        rebuild();
+    if (size == ULONG_MAX) {
+        printf("Out of memory: reached pool limit - exit.\n");
+        exit(EXIT_FAILURE);
     }
+
+    assert(next <= size);
+    if (next < size)
+        return size;
+
+    //if we use more than half bits of unsigned long, increase size
+    //with a constant, else duplicate it
+    unsigned long bits = sizeof(unsigned long) * CHAR_BIT;
+    unsigned long inc = 1 << 8;
+    unsigned long new_size;
+
+    if (size == 0)
+        new_size = 4;
+    else if (ULONG_MAX - size < inc)
+        new_size = ULONG_MAX;
+    else if (size >> (bits/2))
+        new_size = size + inc;
+    else
+        new_size = size << 1;
+
+    assert(new_size);
+
+    //NOTE: *pool may be NULL
+    void *new_pool = (void *)realloc(*pool,new_size * element_size);
+    if (!new_pool) {
+        printf("Out of memory: realloc failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    void *old_pool = *pool;
+    *pool = new_pool;
+    if (old_pool != new_pool && should_rebuild)
+        rebuild();
+
+    return new_size;
 }
 
 static inline int is_invalid_node_name(char *s) {
@@ -146,32 +167,55 @@ static inline int is_invalid_node_name(char *s) {
     return 1;
 }
 
-static inline struct container_node parse_node(char **buf, char *info) {
-    char *name = parse_string(buf,info);
+static inline struct container_node parse_node(char **buf, struct element *el,
+                                               enum connection_type type) {
+    assert(el);
+
+    char *name = parse_string(buf,"node identifier");
     if (is_invalid_node_name(name))
         exit(EXIT_FAILURE);
 
+    //do not track ground node
+    struct node *ground = &node_pool[0];
+    if (strcmp(ground->name,name) == 0) {
+        free(name);
+        ground->refs++;
+        struct container_node container = { .nuid=ground->nuid, ._node=ground };
+        return container;
+    }
+
     unsigned long i;
-    for (i=0; i<node_pool_next; ++i) {
+    for (i=1; i<node_pool_next; ++i) {
         struct node *_node = &node_pool[i];
         if (strcmp(_node->name,name) == 0) {
             free(name);
-            _node->refs++;
-            unsigned long _nuid = _node->nuid;
-            struct container_node container = { .nuid=_nuid, ._node=_node };
+            _node->el_size = grow((void**)&_node->element,_node->el_size,
+                                  sizeof(unsigned long),_node->refs,
+                                  NO_REBUILD);
+            _node->element[_node->refs++] = set_conn_type(el->euid,type);
+
+            struct container_node container = { .nuid=_node->nuid, ._node=_node };
             return container;
         }
     }
 
     /* check if we need to resize the pool */
-    grow((void**)&node_pool,&node_pool_size,sizeof(struct node),node_pool_next);
+    node_pool_size = grow((void**)&node_pool,node_pool_size,
+                          sizeof(struct node),node_pool_next,SHOULD_REBUILD);
 
     struct node *_node = &node_pool[node_pool_next++];
     unsigned long _nuid = __nuid__++;
     _node->nuid = _nuid;
     _node->name = name;
     _node->value = 0;
-    _node->refs = 1;
+    _node->refs = 0;
+    _node->el_size = 0;
+    _node->element = NULL;
+
+    _node->el_size = grow((void**)&_node->element,_node->el_size,
+                          sizeof(unsigned long),_node->refs,
+                          NO_REBUILD);
+    _node->element[_node->refs++] = set_conn_type(el->euid,type);
 
     struct container_node container = { .nuid=_nuid, ._node=_node };
     return container;
@@ -185,19 +229,15 @@ static inline struct element *get_new_element(char type) {
     switch (type) {
     case 'v':
     case 'l':
-        grow((void**)
-             &el_group2_pool,
-             &el_group2_pool_size,
-             sizeof(struct element),
-             el_group2_pool_next);
+        el_group2_pool_size = grow((void**)&el_group2_pool,el_group2_pool_size,
+                                   sizeof(struct element),el_group2_pool_next,
+                                   SHOULD_REBUILD);
         el = &el_group2_pool[el_group2_pool_next++];
         break;
     default:
-        grow((void**)
-             &el_group1_pool,
-             &el_group1_pool_size,
-             sizeof(struct element),
-             el_group1_pool_next);
+        el_group1_pool_size = grow((void**)&el_group1_pool,el_group1_pool_size,
+                                   sizeof(struct element),el_group1_pool_next,
+                                   SHOULD_REBUILD);
         el = &el_group1_pool[el_group1_pool_next++];
     }
 
@@ -347,6 +387,8 @@ void parser_init() {
     ground->nuid = 0;
     ground->value = 0;
     ground->refs = 0;
+    ground->el_size = 0;
+    ground->element = NULL;
 }
 
 int is_semantically_correct() {
@@ -623,8 +665,8 @@ void parse_element(char **buf) {
     case 'v':
     case 'i': {
         s_el->name = parse_string(buf,"voltage/current source name");
-        s_el->_vi.vplus = parse_node(buf,"voltage/current '+' node");
-        s_el->_vi.vminus = parse_node(buf,"voltage/current '-' node");
+        s_el->_vi.vplus = parse_node(buf,s_el,CONN_VPLUS);
+        s_el->_vi.vminus = parse_node(buf,s_el,CONN_VMINUS);
         s_el->value = parse_value(buf,NULL,"voltage/current value");
         break;
     }
@@ -632,26 +674,26 @@ void parse_element(char **buf) {
     case 'c':
     case 'l': {
         s_el->name = parse_string(buf,"rlc element name");
-        s_el->_rcl.vplus = parse_node(buf,"rcl '+' node");
-        s_el->_rcl.vminus = parse_node(buf,"rcl '-' node");
+        s_el->_rcl.vplus = parse_node(buf,s_el,CONN_VPLUS);
+        s_el->_rcl.vminus = parse_node(buf,s_el,CONN_VMINUS);
         s_el->value = parse_value(buf,NULL,"rcl value");
         break;
     }
     case 'q': {
         s_el->name = parse_string(buf,"bjt name");
-        s_el->bjt.c = parse_node(buf,"bjt c node");
-        s_el->bjt.b = parse_node(buf,"bjt b node");
-        s_el->bjt.e = parse_node(buf,"bjt e node");
+        s_el->bjt.c = parse_node(buf,s_el,CONN_BJT_C);
+        s_el->bjt.b = parse_node(buf,s_el,CONN_BJT_B);
+        s_el->bjt.e = parse_node(buf,s_el,CONN_BJT_E);
         s_el->bjt.model.name = parse_string(buf,"bjt model name");
         s_el->bjt.area = parse_value_optional(buf,NULL,DEFAULT_BJT_AREA);
         break;
     }
     case 'm': {
         s_el->name = parse_string(buf,"mos name");
-        s_el->mos.d = parse_node(buf,"mos d node");
-        s_el->mos.g = parse_node(buf,"mos g node");
-        s_el->mos.s = parse_node(buf,"mos s node");
-        s_el->mos.b = parse_node(buf,"mos b node");
+        s_el->mos.d = parse_node(buf,s_el,CONN_MOS_D);
+        s_el->mos.g = parse_node(buf,s_el,CONN_MOS_G);
+        s_el->mos.s = parse_node(buf,s_el,CONN_MOS_S);
+        s_el->mos.b = parse_node(buf,s_el,CONN_MOS_B);
         s_el->mos.model.name = parse_string(buf,"mos model name");
         s_el->mos.l = parse_value(buf,"l=","mos length value");
         s_el->mos.w = parse_value(buf,"w=","mos width value");
@@ -659,8 +701,8 @@ void parse_element(char **buf) {
     }
     case 'd': {
         s_el->name = parse_string(buf,"diode name");
-        s_el->diode.vplus = parse_node(buf,"diode '+' node");
-        s_el->diode.vminus = parse_node(buf,"diode '-' node");
+        s_el->diode.vplus = parse_node(buf,s_el,CONN_VPLUS);
+        s_el->diode.vminus = parse_node(buf,s_el,CONN_VMINUS);
         s_el->diode.model.name = parse_string(buf,"diode model name");
         s_el->diode.area = parse_value_optional(buf,NULL,DEFAULT_DIODE_AREA);
         break;
@@ -694,12 +736,6 @@ void parse_command(char **buf) {
     (*buf)++;
 
 #if 0
-    char *name;
-    parse_string(buf,&name);
-
-    if (command_is(name,"")) {
-
-    }
 
 #else
     printf("***  WARNING  ***    command parsing is not implemented yet! - skip command\n");

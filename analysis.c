@@ -4,6 +4,22 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
+
+enum connection_type get_conn_type(unsigned long annotated_id) {
+    unsigned long bits = annotated_id & (unsigned long)CONN_MASK;
+    assert(bits <= CONN_LAST_TYPE);
+    enum connection_type type = (enum connection_type) bits;
+    return type;
+}
+
+unsigned long set_conn_type(unsigned long id, enum connection_type type) {
+    //the first CONN_BITS of id must be empty!
+    assert(!(id >> (sizeof(unsigned long) * CHAR_BIT - CONN_BITS)));
+
+    unsigned long annotated_id = (id << CONN_BITS) | (unsigned long)type;
+    return annotated_id;
+}
 
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
     assert(netlist);

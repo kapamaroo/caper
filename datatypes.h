@@ -1,11 +1,29 @@
 #ifndef __DATATYPES_H__
 #define __DATATYPES_H__
 
+enum connection_type {
+    CONN_VPLUS = 0,
+    CONN_VMINUS,
+    CONN_BJT_C,
+    CONN_BJT_E,
+    CONN_BJT_B,
+    CONN_MOS_S,
+    CONN_MOS_D,
+    CONN_MOS_G,
+    CONN_MOS_B
+};
+
+#define CONN_LAST_TYPE CONN_MOS_B
+#define CONN_BITS 4
+#define CONN_MASK ((1 << (CONN_BITS)) - 1)
+
 struct node {
     unsigned long nuid;
     char *name;
     double value;
     unsigned long refs;
+    unsigned long el_size;
+    unsigned long *element;
 };
 
 struct container_node {
@@ -109,5 +127,8 @@ struct netlist_info {
     struct element *el_group1_pool;
     struct element *el_group2_pool;
 };
+
+enum connection_type get_conn_type(unsigned long annotated_id);
+unsigned long set_conn_type(unsigned long id, enum connection_type type);
 
 #endif
