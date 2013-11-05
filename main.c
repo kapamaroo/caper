@@ -45,7 +45,7 @@ void handle_file(char *filename) {
         return;
     }
 
-#if 0
+#if 1
     printf("\n\n***    Circuit Elements    ***\n\n");
     print_elements(netlist.el_group1_size,netlist.el_group1_pool);
     print_elements(netlist.el_group2_size,netlist.el_group2_pool);
@@ -74,6 +74,10 @@ void handle_file(char *filename) {
     printf("\n***    S2\n");
     print_double_array(analysis.el_group2_size,1,analysis.S2);
 #endif
+
+    unsigned long mna_size = analysis.n + analysis.el_group2_size;
+    printf("\n***    MNA Vector\n");
+    print_double_array(mna_size,mna_size,analysis.mna_vector);
 
     printf("elements = %lu\n",analysis.e);
     printf("nodes = %lu  //without ground\n",analysis.n);

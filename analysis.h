@@ -7,7 +7,7 @@ struct analysis_info {
     int error;
 
     union {
-        unsigned long node_size;
+        unsigned long node_size;  //without the ground node
         unsigned long n;
     };
 
@@ -19,6 +19,7 @@ struct analysis_info {
     unsigned long el_group1_size;
     unsigned long el_group2_size;
 
+#if 0
     char *A;     //nodes x elements array (without the ground node)
     char *At;    //transposed A
 
@@ -27,6 +28,7 @@ struct analysis_info {
 
     char *A2;
     char *A2t;
+#endif
 
     double *G;  //resistance matrix (m1 x m1) diagonal
     double *C;  //capacity matrix (m1 x m1) diagonal
@@ -42,6 +44,8 @@ struct analysis_info {
 
     double *i;  //element's current
                 //('el_size' elements)
+
+    double *mna_vector;
 };
 
 void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis);

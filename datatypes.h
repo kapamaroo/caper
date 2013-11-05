@@ -47,13 +47,15 @@ unsigned long get_conn_raw_id(unsigned long annotated_id);
 unsigned long set_conn_info(unsigned long id, enum connection_type conn_type,
                             char el_type);
 
+struct container_element;
+
 struct node {
     unsigned long nuid;
     char *name;
     double value;
     unsigned long refs;
     unsigned long el_size;
-    unsigned long *element;
+    struct container_element *attached_el;
 };
 
 struct container_node {
@@ -121,6 +123,7 @@ struct element {
 
     /* pin classification */
     char type;
+    unsigned long idx;  //to which pool depends on type
     union {
         struct _source_ *_vi;
         struct _source_ *v;
@@ -137,6 +140,12 @@ struct element {
 
         void *raw_ptr;
     };
+};
+
+struct container_element {
+    char type;
+    unsigned long idx;
+    struct element *_el;
 };
 
 struct netlist_info {

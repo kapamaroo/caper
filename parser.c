@@ -107,6 +107,18 @@ static inline void rebuild() {
             exit(EXIT_FAILURE);
         }
     }
+
+    //ignore ground node
+    for (i=1; i<node_pool_next; ++i) {
+        struct node *_node = &node_pool[i];
+        unsigned long j;
+        for (j=0; j<_node->refs; ++j) {
+            struct element *pool = el_group1_pool;
+            if (_node->attached_el[j].type == 'v' || _node->attached_el[j].type == 'l')
+                pool = el_group2_pool;
+            _node->attached_el[j]._el = &pool[_node->attached_el[j].idx];
+        }
+    }
 }
 
 static inline
@@ -189,11 +201,13 @@ static inline struct container_node parse_node(char **buf, struct element *el,
         struct node *_node = &node_pool[i];
         if (strcmp(_node->name,name) == 0) {
             free(name);
-            _node->el_size = grow((void**)&_node->element,_node->el_size,
-                                  sizeof(unsigned long),_node->refs,
+            _node->el_size = grow((void**)&_node->attached_el,_node->el_size,
+                                  sizeof(struct container_element),_node->refs,
                                   NO_REBUILD);
-            _node->element[_node->refs++] =
-                set_conn_info(el->euid,conn_type,el->type);
+            _node->attached_el[_node->refs].type = el->type;
+            _node->attached_el[_node->refs].idx = el->idx;
+            _node->attached_el[_node->refs]._el = el;
+            _node->refs++;
 
             struct container_node container = { .nuid=_node->nuid, ._node=_node };
             return container;
@@ -211,12 +225,15 @@ static inline struct container_node parse_node(char **buf, struct element *el,
     _node->value = 0;
     _node->refs = 0;
     _node->el_size = 0;
-    _node->element = NULL;
+    _node->attached_el = NULL;
 
-    _node->el_size = grow((void**)&_node->element,_node->el_size,
-                          sizeof(unsigned long),_node->refs,
+    _node->el_size = grow((void**)&_node->attached_el,_node->el_size,
+                          sizeof(struct container_element),_node->refs,
                           NO_REBUILD);
-    _node->element[_node->refs++] = set_conn_info(el->euid,conn_type,el->type);
+    _node->attached_el[_node->refs].type = el->type;
+    _node->attached_el[_node->refs].idx = el->idx;
+    _node->attached_el[_node->refs]._el = el;
+    _node->refs++;
 
     struct container_node container = { .nuid=_nuid, ._node=_node };
     return container;
@@ -226,6 +243,7 @@ static inline struct element *get_new_element(char type) {
     /* check if we need to resize the pool */
 
     struct element *el = NULL;
+    unsigned long idx;
 
     switch (type) {
     case 'v':
@@ -233,17 +251,20 @@ static inline struct element *get_new_element(char type) {
         el_group2_pool_size = grow((void**)&el_group2_pool,el_group2_pool_size,
                                    sizeof(struct element),el_group2_pool_next,
                                    SHOULD_REBUILD);
-        el = &el_group2_pool[el_group2_pool_next++];
+        el = &el_group2_pool[el_group2_pool_next];
+        idx = el_group2_pool_next++;
         break;
     default:
         el_group1_pool_size = grow((void**)&el_group1_pool,el_group1_pool_size,
                                    sizeof(struct element),el_group1_pool_next,
                                    SHOULD_REBUILD);
-        el = &el_group1_pool[el_group1_pool_next++];
+        el = &el_group1_pool[el_group1_pool_next];
+        idx = el_group1_pool_next++;
     }
 
     assert(el);
     el->type = type;
+    el->idx = idx;
     el->euid = __euid__++;
     el->name = NULL;  //we get the name later
 
@@ -409,7 +430,7 @@ void parser_init() {
     ground->value = 0;
     ground->refs = 0;
     ground->el_size = 0;
-    ground->element = NULL;
+    ground->attached_el = NULL;
 }
 
 int is_semantically_correct() {
