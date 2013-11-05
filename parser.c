@@ -62,28 +62,28 @@ static inline void rebuild() {
         struct element *_el = &el_group1_pool[i];
         switch (_el->type) {
         case 'i':
-            _el->_vi.vplus._node = &node_pool[_el->_vi.vplus.nuid];
-            _el->_vi.vminus._node = &node_pool[_el->_vi.vminus.nuid];
+            _el->_vi->vplus._node = &node_pool[_el->_vi->vplus.nuid];
+            _el->_vi->vminus._node = &node_pool[_el->_vi->vminus.nuid];
             break;
         case 'r':
         case 'c':
-            _el->_rcl.vplus._node = &node_pool[_el->_rcl.vplus.nuid];
-            _el->_rcl.vminus._node = &node_pool[_el->_rcl.vminus.nuid];
+            _el->_rcl->vplus._node = &node_pool[_el->_rcl->vplus.nuid];
+            _el->_rcl->vminus._node = &node_pool[_el->_rcl->vminus.nuid];
             break;
         case 'q':
-            _el->bjt.c._node = &node_pool[_el->bjt.c.nuid];
-            _el->bjt.e._node = &node_pool[_el->bjt.e.nuid];
-            _el->bjt.b._node = &node_pool[_el->bjt.b.nuid];
+            _el->bjt->c._node = &node_pool[_el->bjt->c.nuid];
+            _el->bjt->e._node = &node_pool[_el->bjt->e.nuid];
+            _el->bjt->b._node = &node_pool[_el->bjt->b.nuid];
             break;
         case 'm':
-            _el->mos.s._node = &node_pool[_el->mos.s.nuid];
-            _el->mos.d._node = &node_pool[_el->mos.d.nuid];
-            _el->mos.g._node = &node_pool[_el->mos.g.nuid];
-            _el->mos.b._node = &node_pool[_el->mos.b.nuid];
+            _el->mos->s._node = &node_pool[_el->mos->s.nuid];
+            _el->mos->d._node = &node_pool[_el->mos->d.nuid];
+            _el->mos->g._node = &node_pool[_el->mos->g.nuid];
+            _el->mos->b._node = &node_pool[_el->mos->b.nuid];
             break;
         case 'd':
-            _el->diode.vplus._node = &node_pool[_el->diode.vplus.nuid];
-            _el->diode.vminus._node = &node_pool[_el->diode.vminus.nuid];
+            _el->diode->vplus._node = &node_pool[_el->diode->vplus.nuid];
+            _el->diode->vminus._node = &node_pool[_el->diode->vminus.nuid];
             break;
         default:
             printf("Unknown element type '%c' in group1 pool - exit.\n",_el->type);
@@ -95,12 +95,12 @@ static inline void rebuild() {
         struct element *_el = &el_group2_pool[i];
         switch (_el->type) {
         case 'v':
-            _el->_vi.vplus._node = &node_pool[_el->_vi.vplus.nuid];
-            _el->_vi.vminus._node = &node_pool[_el->_vi.vminus.nuid];
+            _el->_vi->vplus._node = &node_pool[_el->_vi->vplus.nuid];
+            _el->_vi->vminus._node = &node_pool[_el->_vi->vminus.nuid];
             break;
         case 'l':
-            _el->_rcl.vplus._node = &node_pool[_el->_rcl.vplus.nuid];
-            _el->_rcl.vminus._node = &node_pool[_el->_rcl.vminus.nuid];
+            _el->_rcl->vplus._node = &node_pool[_el->_rcl->vplus.nuid];
+            _el->_rcl->vminus._node = &node_pool[_el->_rcl->vminus.nuid];
             break;
         default:
             printf("Unknown element type '%c' in group2 pool - exit.\n",_el->type);
@@ -247,6 +247,26 @@ static inline struct element *get_new_element(char type) {
     el->euid = __euid__++;
     el->name = NULL;  //we get the name later
 
+    unsigned long size = 0;
+    switch (type) {
+    case 'v':
+    case 'i':  size = sizeof(struct _source_);   break;
+    case 'r':
+    case 'c':
+    case 'l':  size = sizeof(struct _passive_);  break;
+    case 'm':  size = sizeof(struct _mos_);      break;
+    case 'q':  size = sizeof(struct _bjt_);      break;
+    case 'd':  size = sizeof(struct _diode_);    break;
+    default:   assert(0);
+    }
+
+    assert(size);
+    el->raw_ptr = malloc(size);
+    if (!el->raw_ptr) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
     return el;
 }
 
@@ -258,8 +278,8 @@ void print_element(struct element *_el) {
     case 'i':
         printf("%s %s %s %+e\n",
                _el->name,
-               _el->_vi.vplus._node->name,
-               _el->_vi.vminus._node->name,
+               _el->_vi->vplus._node->name,
+               _el->_vi->vminus._node->name,
                _el->value);
         break;
     case 'r':
@@ -267,36 +287,36 @@ void print_element(struct element *_el) {
     case 'c':
         printf("%s %s %s %e\n",
                _el->name,
-               _el->_rcl.vplus._node->name,
-               _el->_rcl.vminus._node->name,
+               _el->_rcl->vplus._node->name,
+               _el->_rcl->vminus._node->name,
                _el->value);
         break;
     case 'q':
         printf("%s %s %s %s %s %e\n",
                _el->name,
-               _el->bjt.c._node->name,
-               _el->bjt.b._node->name,
-               _el->bjt.e._node->name,
-               _el->bjt.model.name,
-               _el->bjt.area);
+               _el->bjt->c._node->name,
+               _el->bjt->b._node->name,
+               _el->bjt->e._node->name,
+               _el->bjt->model.name,
+               _el->bjt->area);
         break;
     case 'm':
         printf("%s %s %s %s %s %s L=%e W=%e",
                _el->name,
-               _el->mos.d._node->name,
-               _el->mos.g._node->name,
-               _el->mos.s._node->name,
-               _el->mos.b._node->name,
-               _el->mos.model.name,
-               _el->mos.length,
-               _el->mos.width);
+               _el->mos->d._node->name,
+               _el->mos->g._node->name,
+               _el->mos->s._node->name,
+               _el->mos->b._node->name,
+               _el->mos->model.name,
+               _el->mos->length,
+               _el->mos->width);
         break;
     case 'd':
         printf("%s %s %s %s %+e\n",
                _el->name,
-               _el->diode.vplus._node->name,
-               _el->diode.vminus._node->name,
-               _el->diode.model.name,
+               _el->diode->vplus._node->name,
+               _el->diode->vminus._node->name,
+               _el->diode->model.name,
                _el->value);
         break;
     default:
@@ -666,8 +686,8 @@ void parse_element(char **buf) {
     case 'v':
     case 'i': {
         s_el->name = parse_string(buf,"voltage/current source name");
-        s_el->_vi.vplus = parse_node(buf,s_el,CONN_VPLUS);
-        s_el->_vi.vminus = parse_node(buf,s_el,CONN_VMINUS);
+        s_el->_vi->vplus = parse_node(buf,s_el,CONN_VPLUS);
+        s_el->_vi->vminus = parse_node(buf,s_el,CONN_VMINUS);
         s_el->value = parse_value(buf,NULL,"voltage/current value");
         break;
     }
@@ -675,37 +695,37 @@ void parse_element(char **buf) {
     case 'c':
     case 'l': {
         s_el->name = parse_string(buf,"rlc element name");
-        s_el->_rcl.vplus = parse_node(buf,s_el,CONN_VPLUS);
-        s_el->_rcl.vminus = parse_node(buf,s_el,CONN_VMINUS);
+        s_el->_rcl->vplus = parse_node(buf,s_el,CONN_VPLUS);
+        s_el->_rcl->vminus = parse_node(buf,s_el,CONN_VMINUS);
         s_el->value = parse_value(buf,NULL,"rcl value");
         break;
     }
     case 'q': {
         s_el->name = parse_string(buf,"bjt name");
-        s_el->bjt.c = parse_node(buf,s_el,CONN_BJT_C);
-        s_el->bjt.b = parse_node(buf,s_el,CONN_BJT_B);
-        s_el->bjt.e = parse_node(buf,s_el,CONN_BJT_E);
-        s_el->bjt.model.name = parse_string(buf,"bjt model name");
-        s_el->bjt.area = parse_value_optional(buf,NULL,DEFAULT_BJT_AREA);
+        s_el->bjt->c = parse_node(buf,s_el,CONN_BJT_C);
+        s_el->bjt->b = parse_node(buf,s_el,CONN_BJT_B);
+        s_el->bjt->e = parse_node(buf,s_el,CONN_BJT_E);
+        s_el->bjt->model.name = parse_string(buf,"bjt model name");
+        s_el->bjt->area = parse_value_optional(buf,NULL,DEFAULT_BJT_AREA);
         break;
     }
     case 'm': {
         s_el->name = parse_string(buf,"mos name");
-        s_el->mos.d = parse_node(buf,s_el,CONN_MOS_D);
-        s_el->mos.g = parse_node(buf,s_el,CONN_MOS_G);
-        s_el->mos.s = parse_node(buf,s_el,CONN_MOS_S);
-        s_el->mos.b = parse_node(buf,s_el,CONN_MOS_B);
-        s_el->mos.model.name = parse_string(buf,"mos model name");
-        s_el->mos.l = parse_value(buf,"l=","mos length value");
-        s_el->mos.w = parse_value(buf,"w=","mos width value");
+        s_el->mos->d = parse_node(buf,s_el,CONN_MOS_D);
+        s_el->mos->g = parse_node(buf,s_el,CONN_MOS_G);
+        s_el->mos->s = parse_node(buf,s_el,CONN_MOS_S);
+        s_el->mos->b = parse_node(buf,s_el,CONN_MOS_B);
+        s_el->mos->model.name = parse_string(buf,"mos model name");
+        s_el->mos->l = parse_value(buf,"l=","mos length value");
+        s_el->mos->w = parse_value(buf,"w=","mos width value");
         break;
     }
     case 'd': {
         s_el->name = parse_string(buf,"diode name");
-        s_el->diode.vplus = parse_node(buf,s_el,CONN_VPLUS);
-        s_el->diode.vminus = parse_node(buf,s_el,CONN_VMINUS);
-        s_el->diode.model.name = parse_string(buf,"diode model name");
-        s_el->diode.area = parse_value_optional(buf,NULL,DEFAULT_DIODE_AREA);
+        s_el->diode->vplus = parse_node(buf,s_el,CONN_VPLUS);
+        s_el->diode->vminus = parse_node(buf,s_el,CONN_VMINUS);
+        s_el->diode->model.name = parse_string(buf,"diode model name");
+        s_el->diode->area = parse_value_optional(buf,NULL,DEFAULT_DIODE_AREA);
         break;
     }
     default:

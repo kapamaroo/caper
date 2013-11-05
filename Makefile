@@ -1,5 +1,6 @@
 CC=gcc
-CFLAGS=-Wall -g -I.
+#CFLAGS=-Wall -g
+CFLAGS=-Wall -O3 -march=native
 DEPS = parser.h datatypes.h analysis.h
 OBJ = main.o parser.o analysis.c
 
@@ -7,7 +8,7 @@ OBJ = main.o parser.o analysis.c
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 caper: $(OBJ)
-	gcc -o $@ $^ $(CFLAGS)
+	gcc -o $@ $^ $(CFLAGS_RELEASE)
 
 
 .PHONY: clean

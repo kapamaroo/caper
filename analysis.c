@@ -48,7 +48,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     unsigned long el_group1_size = netlist->el_group1_size;
     unsigned long el_group2_size = netlist->el_group2_size;
 
-    int *A = (int*)calloc((n-1) * e, sizeof(int));
+    char *A = (char*)calloc((n-1) * e, sizeof(char));
     if (!A) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -80,7 +80,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *G = (double*)calloc(el_group1_size * el_group1_size, sizeof(double));
+    double *G = (double*)calloc(el_group1_size, sizeof(double));
     if (!G) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -88,7 +88,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *C = (double*)calloc(el_group1_size * el_group1_size, sizeof(double));
+    double *C = (double*)calloc(el_group1_size, sizeof(double));
     if (!C) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -96,7 +96,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *L = (double*)calloc(el_group2_size * el_group2_size, sizeof(double));
+    double *L = (double*)calloc(el_group2_size, sizeof(double));
     if (!L) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -118,7 +118,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    printf("still alive :)\n");
+    printf("analysis: populating matrices ...\n");
 
     unsigned long i;
     for (i=0; i<el_group1_size; ++i) {
@@ -128,8 +128,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         unsigned long xminus;
         switch (_el->type) {
         case 'i':
-            xplus = _el->i.vplus.nuid;
-            xminus = _el->i.vminus.nuid;
+            xplus = _el->i->vplus.nuid;
+            xminus = _el->i->vminus.nuid;
             if (xplus)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
@@ -139,25 +139,25 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
             break;
         case 'r':
-            xplus = _el->r.vplus.nuid;
-            xminus = _el->r.vminus.nuid;
+            xplus = _el->r->vplus.nuid;
+            xminus = _el->r->vminus.nuid;
             if (xplus)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
 
-            G[y*el_group1_size + y] = 1 / _el->value;
+            G[y] = 1 / _el->value;
 
             break;
         case 'c':
-            xplus = _el->c.vplus.nuid;
-            xminus = _el->c.vminus.nuid;
+            xplus = _el->c->vplus.nuid;
+            xminus = _el->c->vminus.nuid;
             if (xplus)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
 
-            C[y*el_group1_size + y] = _el->value;
+            C[y] = _el->value;
 
             break;
         case 'q':
@@ -172,16 +172,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         default:
             assert(0);
         }
-
-#if 0
-        if (xplus)
-            printf("euid (%lu) writes (+) to A[%lu,%lu]\n",_el->euid,xplus,y);
-        if (xminus)
-            printf("euid (%lu) writes (-) to A[%lu,%lu]\n",_el->euid,xminus,y);
-
-        print_int_array(n-1,e,A);
-#endif
-
     }
 
     for (i=0; i<el_group2_size; ++i) {
@@ -191,8 +181,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         unsigned long xminus;
         switch (_el->type) {
         case 'v':
-            xplus = _el->v.vplus.nuid;
-            xminus = _el->v.vminus.nuid;
+            xplus = _el->v->vplus.nuid;
+            xminus = _el->v->vminus.nuid;
             if (xplus)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
@@ -203,32 +193,26 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
             break;
         case 'l':
-            xplus = _el->l.vplus.nuid;
-            xminus = _el->l.vminus.nuid;
+            xplus = _el->l->vplus.nuid;
+            xminus = _el->l->vminus.nuid;
             if (xplus)
                 A[(xplus-1) * e + y] = 1;
             if (xminus)
                 A[(xminus-1) * e + y] = -1;
 
             //use i directly, L contains only group2 elements
-            L[i*el_group2_size + i] = _el->value;
+            L[i] = _el->value;
 
             break;
         default:
             assert(0);
         }
-
-#if 0
-        if (xplus)
-            printf("euid (%lu) writes (+) to A[%lu,%lu]\n",_el->euid,xplus,y);
-        if (xminus)
-            printf("euid (%lu) writes (-) to A[%lu,%lu]\n",_el->euid,xminus,y);
-
-        print_int_array(n-1,e,A);
-#endif
     }
 
-    int *At = (int*)malloc((n-1) * e * sizeof(int));
+    //create A1 and A1t
+    printf("analysis: creating A1, A2 and transposed matrices ...\n");
+
+    char *At = (char*)malloc((n-1) * e * sizeof(char));
     if (!At) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -241,9 +225,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         }
     }
 
-    //create A1 and A1t
-
-    int *A1 = (int*)malloc((n-1) * el_group1_size * sizeof(int));
+    char *A1 = (char*)malloc((n-1) * el_group1_size * sizeof(char));
     if (!A1) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -255,7 +237,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         }
     }
 
-    int *A1t = (int*)malloc((n-1) * el_group1_size * sizeof(int));
+    char *A1t = (char*)malloc((n-1) * el_group1_size * sizeof(char));
     if (!A1t) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -269,7 +251,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     //create A1 and A1t
 
-    int *A2 = (int*)malloc((n-1) * el_group2_size * sizeof(int));
+    char *A2 = (char*)malloc((n-1) * el_group2_size * sizeof(char));
     if (!A2) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -281,7 +263,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         }
     }
 
-    int *A2t = (int*)malloc((n-1) * el_group2_size * sizeof(int));
+    char *A2t = (char*)malloc((n-1) * el_group2_size * sizeof(char));
     if (!A2t) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -328,6 +310,27 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
 }
 
 void print_int_array(unsigned long row, unsigned long col, int *p) {
+    unsigned long i;
+    unsigned long j;
+
+    printf("==============================================\n");
+    printf("      ");
+    for (j=0; j<col; ++j) {
+        printf("%2lu|",j);
+    }
+    printf("\n     ___________________________________________\n");
+
+    for (i=0; i<row; ++i) {
+        printf("%3lu | ",i + 1);
+        for (j=0; j<col; ++j) {
+            int val = p[i*col + j];
+            printf("% 2d ",val);
+        }
+        printf("\n");
+    }
+}
+
+void print_char_int_array(unsigned long row, unsigned long col, char *p) {
     unsigned long i;
     unsigned long j;
 

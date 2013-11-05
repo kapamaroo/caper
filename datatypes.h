@@ -122,18 +122,20 @@ struct element {
     /* pin classification */
     char type;
     union {
-        struct _source_ _vi;
-        struct _source_ v;
-        struct _source_ i;
+        struct _source_ *_vi;
+        struct _source_ *v;
+        struct _source_ *i;
 
-        struct _passive_ _rcl;
-        struct _passive_ r;
-        struct _passive_ c;
-        struct _passive_ l;
+        struct _passive_ *_rcl;
+        struct _passive_ *r;
+        struct _passive_ *c;
+        struct _passive_ *l;
 
-        struct _mos_ mos;
-        struct _bjt_ bjt;
-        struct _diode_ diode;
+        struct _mos_ *mos;
+        struct _bjt_ *bjt;
+        struct _diode_ *diode;
+
+        void *raw_ptr;
     };
 };
 

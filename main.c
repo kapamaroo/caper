@@ -12,6 +12,30 @@ void about() {
 
 }
 
+void debug_info() {
+    printf("sizeof(struct node) = %lu\n",sizeof(struct node));
+    printf("sizeof(struct element) = %lu\n",sizeof(struct element));
+    printf("sizeof(struct _source_) = %lu\n",sizeof(struct _source_));
+    printf("sizeof(struct _passive_) = %lu\n",sizeof(struct _passive_));
+    printf("sizeof(struct _mos_) = %lu\n",sizeof(struct _mos_));
+    printf("sizeof(struct _bjt_) = %lu\n",sizeof(struct _bjt_));
+    printf("sizeof(struct _diode_) = %lu\n",sizeof(struct _diode_));
+
+#if 0
+    printf("sizeof(struct node*) = %lu\n",sizeof(struct node*));
+    printf("sizeof(struct element*) = %lu\n",sizeof(struct element*));
+    printf("sizeof(struct _source_*) = %lu\n",sizeof(struct _source_*));
+    printf("sizeof(struct _passive_*) = %lu\n",sizeof(struct _passive_*));
+    printf("sizeof(struct _mos_*) = %lu\n",sizeof(struct _mos_*));
+    printf("sizeof(struct _bjt_*) = %lu\n",sizeof(struct _bjt_*));
+    printf("sizeof(struct _diode_*) = %lu\n",sizeof(struct _diode_*));
+
+    printf("sizeof(unsigned long*) = %lu\n",sizeof(unsigned long*));
+#endif
+
+    printf("sizeof(void*) = %lu\n",sizeof(void*));
+}
+
 void handle_file(char *filename) {
     printf("\n================    File name: '%s    ================\n",filename);
     struct netlist_info netlist;
@@ -21,36 +45,45 @@ void handle_file(char *filename) {
         return;
     }
 
+#if 0
     printf("\n\n***    Circuit Elements    ***\n\n");
     print_elements(netlist.el_group1_size,netlist.el_group1_pool);
     print_elements(netlist.el_group2_size,netlist.el_group2_pool);
     printf("\n\n***    Circuit Nodes    ***\n\n");
     print_nodes(netlist.node_size,netlist.node_pool);
+#endif
 
     struct analysis_info analysis;
     analyse_kvl(&netlist,&analysis);
-    print_int_array(analysis.n, analysis.e, analysis.A);
 
-    printf("***    Transposed A\n");
-    print_int_array(analysis.e,analysis.n,analysis.At);
-    printf("***    A1\n");
-    print_int_array(analysis.n,analysis.el_group1_size,analysis.A1);
-    printf("***    A2\n");
-    print_int_array(analysis.n,analysis.el_group2_size,analysis.A2);
-    printf("***    G\n");
-    print_double_array(analysis.el_group1_size,analysis.el_group1_size,analysis.G);
-    printf("***    C\n");
-    print_double_array(analysis.el_group1_size,analysis.el_group1_size,analysis.C);
-    printf("***    L\n");
-    print_double_array(analysis.el_group2_size,analysis.el_group2_size,analysis.L);
-    printf("***    S1\n");
+#if 0
+    printf("\n***    A\n");
+    print_char_int_array(analysis.n, analysis.e, analysis.A);
+    printf("\n***    A1\n");
+    print_char_int_array(analysis.n,analysis.el_group1_size,analysis.A1);
+    printf("\n***    A2\n");
+    print_char_int_array(analysis.n,analysis.el_group2_size,analysis.A2);
+    printf("\n***    G\n");
+    print_double_array(analysis.el_group1_size,1,analysis.G);
+    printf("\n***    C\n");
+    print_double_array(analysis.el_group1_size,1,analysis.C);
+    printf("\n***    L\n");
+    print_double_array(analysis.el_group2_size,1,analysis.L);
+    printf("\n***    S1\n");
     print_double_array(analysis.el_group1_size,1,analysis.S1);
-    printf("***    S2\n");
+    printf("\n***    S2\n");
     print_double_array(analysis.el_group2_size,1,analysis.S2);
+#endif
+
+    printf("elements = %lu\n",analysis.e);
+    printf("nodes = %lu  //without ground\n",analysis.n);
 }
 
 int main(int argc, char *argv[]) {
     int i;
+
+    debug_info();
+
     for (i=1; i<argc; ++i) {
         handle_file(argv[i]);
     }

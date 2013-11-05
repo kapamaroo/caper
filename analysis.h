@@ -19,14 +19,14 @@ struct analysis_info {
     unsigned long el_group1_size;
     unsigned long el_group2_size;
 
-    int *A;     //nodes x elements array (without the ground node)
-    int *At;    //transposed A
+    char *A;     //nodes x elements array (without the ground node)
+    char *At;    //transposed A
 
-    int *A1;
-    int *A1t;
+    char *A1;
+    char *A1t;
 
-    int *A2;
-    int *A2t;
+    char *A2;
+    char *A2t;
 
     double *G;  //resistance matrix (m1 x m1) diagonal
     double *C;  //capacity matrix (m1 x m1) diagonal
@@ -49,6 +49,7 @@ void analyse_kcl(struct netlist_info *netlist, struct analysis_info *analysis);
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
 
 void print_int_array(unsigned long row, unsigned long col, int *p);
+void print_char_int_array(unsigned long row, unsigned long col, char *p);
 void print_double_array(unsigned long row, unsigned long col, double *p);
 
 #endif
