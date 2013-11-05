@@ -7,17 +7,35 @@
 #include <limits.h>
 
 enum connection_type get_conn_type(unsigned long annotated_id) {
-    unsigned long bits = annotated_id & (unsigned long)CONN_MASK;
+    //throw the CONN_EL_GROUP_BITS
+    annotated_id >>= CONN_EL_GROUP_BITS;
+    unsigned long bits = annotated_id & (unsigned long)CONN_TYPE_MASK;
     assert(bits <= CONN_LAST_TYPE);
     enum connection_type type = (enum connection_type) bits;
     return type;
 }
 
-unsigned long set_conn_type(unsigned long id, enum connection_type type) {
-    //the first CONN_BITS of id must be empty!
-    assert(!(id >> (sizeof(unsigned long) * CHAR_BIT - CONN_BITS)));
+enum connection_el_group get_conn_el_group(unsigned long annotated_id) {
+    unsigned long bits = annotated_id & CONN_EL_GROUP_MASK;
+    enum connection_el_group group = (enum connection_el_group) bits;
+    return group;
+}
 
-    unsigned long annotated_id = (id << CONN_BITS) | (unsigned long)type;
+unsigned long get_conn_raw_id(unsigned long annotated_id) {
+    return annotated_id >> CONN_INFO_BITS;
+}
+
+unsigned long set_conn_info(unsigned long id, enum connection_type conn_type,
+                            char el_type) {
+    //the first CONN_INFO_BITS of id must be empty!
+    assert(!(id >> (sizeof(unsigned long) * CHAR_BIT - CONN_INFO_BITS)));
+
+    enum connection_el_group group = CONN_EL_GROUP1;
+    if (el_type == 'v' || el_type == 'l')
+        group = CONN_EL_GROUP2;
+
+    unsigned long annotated_id = (id << CONN_TYPE_BITS) | (unsigned long)conn_type;
+    annotated_id = (annotated_id << CONN_EL_GROUP_BITS) | (unsigned long)group;
     return annotated_id;
 }
 

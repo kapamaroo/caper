@@ -168,7 +168,7 @@ static inline int is_invalid_node_name(char *s) {
 }
 
 static inline struct container_node parse_node(char **buf, struct element *el,
-                                               enum connection_type type) {
+                                               enum connection_type conn_type) {
     assert(el);
 
     char *name = parse_string(buf,"node identifier");
@@ -192,7 +192,8 @@ static inline struct container_node parse_node(char **buf, struct element *el,
             _node->el_size = grow((void**)&_node->element,_node->el_size,
                                   sizeof(unsigned long),_node->refs,
                                   NO_REBUILD);
-            _node->element[_node->refs++] = set_conn_type(el->euid,type);
+            _node->element[_node->refs++] =
+                set_conn_info(el->euid,conn_type,el->type);
 
             struct container_node container = { .nuid=_node->nuid, ._node=_node };
             return container;
@@ -215,7 +216,7 @@ static inline struct container_node parse_node(char **buf, struct element *el,
     _node->el_size = grow((void**)&_node->element,_node->el_size,
                           sizeof(unsigned long),_node->refs,
                           NO_REBUILD);
-    _node->element[_node->refs++] = set_conn_type(el->euid,type);
+    _node->element[_node->refs++] = set_conn_info(el->euid,conn_type,el->type);
 
     struct container_node container = { .nuid=_nuid, ._node=_node };
     return container;
