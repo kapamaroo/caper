@@ -1,6 +1,14 @@
 #ifndef __DATATYPES_H__
 #define __DATATYPES_H__
 
+#define PRECISION_DOUBLE
+
+#ifdef PRECISION_DOUBLE
+typedef double dfloat_t;
+#else
+typedef float dfloat_t;
+#endif
+
 enum connection_type {
     CONN_VPLUS = 0,
     CONN_VMINUS,
@@ -52,7 +60,7 @@ struct container_element;
 struct node {
     unsigned long nuid;
     char *name;
-    double value;
+    dfloat_t value;
     unsigned long refs;
     unsigned long el_size;
     struct container_element *attached_el;
@@ -91,12 +99,12 @@ struct _mos_ {
     struct container_node b;
     struct nonlinear_model model;
     union {
-        double l;
-        double length;
+        dfloat_t l;
+        dfloat_t length;
     };
     union {
-        double w;
-        double width;
+        dfloat_t w;
+        dfloat_t width;
     };
 };
 
@@ -105,21 +113,21 @@ struct _bjt_ {
     struct container_node e;
     struct container_node b;
     struct nonlinear_model model;
-    double area;
+    dfloat_t area;
 };
 
 struct _diode_ {
     struct container_node vplus;
     struct container_node vminus;
     struct nonlinear_model model;
-    double area;
+    dfloat_t area;
 };
 
 struct element {
     /* common */
     unsigned long euid;
     char *name;
-    double value;
+    dfloat_t value;
 
     /* pin classification */
     char type;

@@ -30,22 +30,22 @@ struct analysis_info {
     char *A2t;
 #endif
 
-    double *G;  //resistance matrix (m1 x m1) diagonal
-    double *C;  //capacity matrix (m1 x m1) diagonal
-    double *L;  //self inductor matrix  (m2 x m2) diagonal
-    double *S1; //group1 current source vector (m1 x 1)
-    double *S2; //group2 voltage source vector (m2 x 1)
+    dfloat_t *G;  //resistance matrix (m1 x m1) diagonal
+    dfloat_t *C;  //capacity matrix (m1 x m1) diagonal
+    dfloat_t *L;  //self inductor matrix  (m2 x m2) diagonal
+    dfloat_t *S1; //group1 current source vector (m1 x 1)
+    dfloat_t *S2; //group2 voltage source vector (m2 x 1)
 
-    double *v;  //node's voltage relative to ground
-                //('node_size' elements)
+    dfloat_t *v;  //node's voltage relative to ground
+                  //('node_size' elements)
 
-    double *u;  //element's voltage from vplus(+) to vminus(-) nodes
-                //('el_size' elements)
+    dfloat_t *u;  //element's voltage from vplus(+) to vminus(-) nodes
+                  //('el_size' elements)
 
-    double *i;  //element's current
-                //('el_size' elements)
+    dfloat_t *i;  //element's current
+                  //('el_size' elements)
 
-    double *mna_vector;
+    dfloat_t *mna_vector;
 };
 
 void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis);
@@ -54,6 +54,6 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
 
 void print_int_array(unsigned long row, unsigned long col, int *p);
 void print_char_int_array(unsigned long row, unsigned long col, char *p);
-void print_double_array(unsigned long row, unsigned long col, double *p);
+void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p);
 
 #endif

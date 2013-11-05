@@ -50,7 +50,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     unsigned long mna_vector_size = n-1 + el_group2_size;
     printf("analysis: trying to allocate %lu bytes ...\n",mna_vector_size * mna_vector_size);
-    double *mna_vector = (double*)calloc(mna_vector_size * mna_vector_size,sizeof(double));
+    dfloat_t *mna_vector = (dfloat_t*)calloc(mna_vector_size * mna_vector_size,sizeof(dfloat_t));
     if (!mna_vector) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -66,7 +66,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *v = (double*)calloc((n-1), sizeof(double));
+    dfloat_t *v = (dfloat_t*)calloc((n-1), sizeof(dfloat_t));
     if (!v) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -74,7 +74,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *u = (double*)calloc(e, sizeof(double));
+    dfloat_t *u = (dfloat_t*)calloc(e, sizeof(dfloat_t));
     if (!u) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -82,7 +82,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *i_current = (double*)calloc(e, sizeof(double));
+    dfloat_t *i_current = (dfloat_t*)calloc(e, sizeof(dfloat_t));
     if (!i_current) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -90,7 +90,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *G = (double*)calloc(el_group1_size, sizeof(double));
+    dfloat_t *G = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
     if (!G) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -98,7 +98,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *C = (double*)calloc(el_group1_size, sizeof(double));
+    dfloat_t *C = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
     if (!C) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -106,7 +106,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *L = (double*)calloc(el_group2_size, sizeof(double));
+    dfloat_t *L = (dfloat_t*)calloc(el_group2_size, sizeof(dfloat_t));
     if (!L) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -114,7 +114,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *S1 = (double*)calloc(el_group1_size, sizeof(double));
+    dfloat_t *S1 = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
     if (!S1) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -122,7 +122,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     printf("still alive :)\n");
 
-    double *S2 = (double*)calloc(el_group2_size, sizeof(double));
+    dfloat_t *S2 = (dfloat_t*)calloc(el_group2_size, sizeof(dfloat_t));
     if (!S2) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -324,7 +324,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 if (_node->nuid) {
                     unsigned long row = _node->nuid - 1;
                     unsigned long offset = n - 1;
-                    double value = (_node == el->v->vplus._node) ? +1 : -1;
+                    dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
 
                     //group2 element, populate A2
                     mna_vector[row*mna_vector_size + offset + el->idx] = value;
@@ -415,7 +415,7 @@ void print_char_int_array(unsigned long row, unsigned long col, char *p) {
     }
 }
 
-void print_double_array(unsigned long row, unsigned long col, double *p) {
+void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p) {
     unsigned long i;
     unsigned long j;
 
@@ -429,8 +429,8 @@ void print_double_array(unsigned long row, unsigned long col, double *p) {
     for (i=0; i<row; ++i) {
         printf("%3lu | ",i + 1);
         for (j=0; j<col; ++j) {
-            double val = p[i*col + j];
-            printf("%2g ",val);
+            dfloat_t val = p[i*col + j];
+            printf("%5.2g ",val);
         }
         printf("\n");
     }

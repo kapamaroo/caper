@@ -21,6 +21,10 @@ void debug_info() {
     printf("sizeof(struct _bjt_) = %lu\n",sizeof(struct _bjt_));
     printf("sizeof(struct _diode_) = %lu\n",sizeof(struct _diode_));
 
+    printf("sizeof(float) = %lu\n",sizeof(float));
+    printf("sizeof(double) = %lu\n",sizeof(double));
+    printf("sizeof(dfloat_t) = %lu\n",sizeof(dfloat_t));
+
 #if 0
     printf("sizeof(struct node*) = %lu\n",sizeof(struct node*));
     printf("sizeof(struct element*) = %lu\n",sizeof(struct element*));
@@ -64,20 +68,20 @@ void handle_file(char *filename) {
     printf("\n***    A2\n");
     print_char_int_array(analysis.n,analysis.el_group2_size,analysis.A2);
     printf("\n***    G\n");
-    print_double_array(analysis.el_group1_size,1,analysis.G);
+    print_dfloat_array(analysis.el_group1_size,1,analysis.G);
     printf("\n***    C\n");
-    print_double_array(analysis.el_group1_size,1,analysis.C);
+    print_dfloat_array(analysis.el_group1_size,1,analysis.C);
     printf("\n***    L\n");
-    print_double_array(analysis.el_group2_size,1,analysis.L);
+    print_dfloat_array(analysis.el_group2_size,1,analysis.L);
     printf("\n***    S1\n");
-    print_double_array(analysis.el_group1_size,1,analysis.S1);
+    print_dfloat_array(analysis.el_group1_size,1,analysis.S1);
     printf("\n***    S2\n");
-    print_double_array(analysis.el_group2_size,1,analysis.S2);
+    print_dfloat_array(analysis.el_group2_size,1,analysis.S2);
 #endif
 
     unsigned long mna_size = analysis.n + analysis.el_group2_size;
     printf("\n***    MNA Vector\n");
-    print_double_array(mna_size,mna_size,analysis.mna_vector);
+    print_dfloat_array(mna_size,mna_size,analysis.mna_vector);
 
     printf("elements = %lu\n",analysis.e);
     printf("nodes = %lu  //without ground\n",analysis.n);

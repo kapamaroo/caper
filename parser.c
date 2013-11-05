@@ -608,7 +608,7 @@ char *parse_string(char **buf, char *info) {
     return name;
 }
 
-double parse_value(char **buf, char *prefix, char *info) {
+dfloat_t parse_value(char **buf, char *prefix, char *info) {
     //printf("in function: %s\n",__FUNCTION__);
 
     if (!*buf || isspace(**buf)) {
@@ -633,22 +633,12 @@ double parse_value(char **buf, char *prefix, char *info) {
     char *end = current_input->raw_end;
     errno = 0;
 
-#if 0
-#error bug bug bug!!!
-    char *endptr = *buf;
-    double value = strtod(*buf,&endptr);
-    if (errno) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-    if (*buf == endptr) {
-        printf("Error: bad value\n");
-        exit(EXIT_FAILURE);
-    }
-    *buf = endptr;
-#else
-    double value;
+    dfloat_t value;
+#ifdef PRECISION_DOUBLE
     int status = sscanf(*buf,"%lf",&value);
+#else
+    int status = sscanf(*buf,"%f",&value);
+#endif
     if (status == EOF) {
         printf("error: sscanf() early fail\n");
         exit(EXIT_FAILURE);
@@ -663,8 +653,6 @@ double parse_value(char **buf, char *prefix, char *info) {
             break;
         (*buf)++;
     }
-
-#endif
 
     if (*buf == end)
         *buf = NULL;
@@ -687,7 +675,7 @@ double parse_value(char **buf, char *prefix, char *info) {
     return value;
 }
 
-double parse_value_optional(char **buf, char *prefix, double default_value) {
+dfloat_t parse_value_optional(char **buf, char *prefix, dfloat_t default_value) {
     //printf("in function: %s\n",__FUNCTION__);
 
     if (!*buf || isspace(**buf))
