@@ -113,8 +113,8 @@ void *hash_get(struct hash_table *ht, char *key) {
         int status = strcmp(key,root->key);
         if (status == 0)
             return root->data;
-        else if (status < 0)
-            return NULL;
+        //else if (status < 0)
+        //    return NULL;
         root = root->next;
     }
     return NULL;
