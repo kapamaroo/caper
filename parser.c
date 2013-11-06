@@ -57,7 +57,7 @@ static unsigned long node_pool_size = INIT_NODE_POOL_SIZE;
 static unsigned long node_pool_next = 1;
 struct node *node_pool = NULL;
 
-static unsigned int node_hash_size = 128;
+static unsigned int node_hash_size = 1013;
 struct hash_table *node_hash_table = NULL;
 
 static inline void rebuild() {
@@ -257,6 +257,8 @@ static inline struct container_node parse_node(char **buf, struct element *el,
 
     unsigned long _nuid = __nuid__++;
     _node = &node_pool[node_pool_next++];
+
+#if 1
     _cnode = (struct container_node*)malloc(sizeof(struct container_node));
     if (!_cnode) {
         perror(__FUNCTION__);
@@ -266,6 +268,7 @@ static inline struct container_node parse_node(char **buf, struct element *el,
     _cnode->_node = _node;
 
     hash_insert(node_hash_table,name,_cnode);
+#endif
 
     _node->nuid = _nuid;
     _node->name = name;
