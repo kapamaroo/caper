@@ -13,6 +13,7 @@
 #include <ctype.h>
 
 #include "parser.h"
+#include "hash.h"
 
 #define SHOULD_REBUILD 1
 #define NO_REBUILD 0
@@ -55,6 +56,9 @@ static unsigned long node_pool_size = INIT_NODE_POOL_SIZE;
 //reserve the first node to be the ground node
 static unsigned long node_pool_next = 1;
 struct node *node_pool = NULL;
+
+static unsigned int node_hash_size = 128;
+struct hash_table *node_hash_table = NULL;
 
 static inline void rebuild() {
     unsigned long i;
@@ -117,6 +121,16 @@ static inline void rebuild() {
             if (_node->attached_el[j].type == 'v' || _node->attached_el[j].type == 'l')
                 pool = el_group2_pool;
             _node->attached_el[j]._el = &pool[_node->attached_el[j].idx];
+        }
+    }
+
+    for (i=0; i<node_hash_table->size; ++i) {
+        struct hash_element *root = node_hash_table->pool[i];
+        while (root) {
+            struct container_node *_cnode = root->data;
+            struct node **_node_ptr = &_cnode->_node;
+            *_node_ptr = &node_pool[_cnode->nuid];
+            root = root->next;
         }
     }
 }
@@ -196,9 +210,13 @@ static inline struct container_node parse_node(char **buf, struct element *el,
         return container;
     }
 
+    struct node *_node = NULL;
+    struct container_node *_cnode = NULL;
+
+#if 0
     unsigned long i;
     for (i=1; i<node_pool_next; ++i) {
-        struct node *_node = &node_pool[i];
+        _node = &node_pool[i];
         if (strcmp(_node->name,name) == 0) {
             free(name);
             _node->el_size = grow((void**)&_node->attached_el,_node->el_size,
@@ -213,13 +231,42 @@ static inline struct container_node parse_node(char **buf, struct element *el,
             return container;
         }
     }
+#else
+    _cnode = hash_get(node_hash_table,name);
+    if (_cnode) {
+        _node = _cnode->_node;
+        assert(_node->nuid != 0);
+        free(name);
+        _node->el_size = grow((void**)&_node->attached_el,_node->el_size,
+                              sizeof(struct container_element),_node->refs,
+                              NO_REBUILD);
+        _node->attached_el[_node->refs].type = el->type;
+        _node->attached_el[_node->refs].idx = el->idx;
+        _node->attached_el[_node->refs]._el = el;
+        _node->refs++;
+
+        struct container_node container = { .nuid=_node->nuid, ._node=_node };
+        return container;
+    }
+
+#endif
 
     /* check if we need to resize the pool */
     node_pool_size = grow((void**)&node_pool,node_pool_size,
                           sizeof(struct node),node_pool_next,SHOULD_REBUILD);
 
-    struct node *_node = &node_pool[node_pool_next++];
     unsigned long _nuid = __nuid__++;
+    _node = &node_pool[node_pool_next++];
+    _cnode = (struct container_node*)malloc(sizeof(struct container_node));
+    if (!_cnode) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+    _cnode->nuid = _nuid;
+    _cnode->_node = _node;
+
+    hash_insert(node_hash_table,name,_cnode);
+
     _node->nuid = _nuid;
     _node->name = name;
     _node->value = 0;
@@ -393,6 +440,10 @@ void parser_init() {
         free(node_pool);
         node_pool = NULL;
     }
+
+    if (node_hash_table)
+        hash_clean_table(node_hash_table);
+    node_hash_table = hash_create_table(node_hash_size);
 
     __euid__ = 0;
 
