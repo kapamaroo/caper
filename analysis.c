@@ -48,9 +48,16 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     unsigned long el_group1_size = netlist->el_group1_size;
     unsigned long el_group2_size = netlist->el_group2_size;
 
-    unsigned long mna_vector_size = n-1 + el_group2_size;
-    printf("analysis: trying to allocate %lu bytes ...\n",mna_vector_size * mna_vector_size);
-    dfloat_t *mna_vector = (dfloat_t*)calloc(mna_vector_size * mna_vector_size,sizeof(dfloat_t));
+    unsigned long mna_dim_size = n-1 + el_group2_size;
+    printf("analysis: trying to allocate %lu bytes ...\n",
+           mna_dim_size * mna_dim_size * sizeof(dfloat_t));
+    dfloat_t *mna_matrix = (dfloat_t*)calloc(mna_dim_size * mna_dim_size,sizeof(dfloat_t));
+    if (!mna_matrix) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *mna_vector = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
     if (!mna_vector) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -64,15 +71,11 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     }
 #endif
 
-    printf("still alive :)\n");
-
     dfloat_t *v = (dfloat_t*)calloc((n-1), sizeof(dfloat_t));
     if (!v) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-
-    printf("still alive :)\n");
 
     dfloat_t *u = (dfloat_t*)calloc(e, sizeof(dfloat_t));
     if (!u) {
@@ -80,15 +83,11 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    printf("still alive :)\n");
-
     dfloat_t *i_current = (dfloat_t*)calloc(e, sizeof(dfloat_t));
     if (!i_current) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-
-    printf("still alive :)\n");
 
     dfloat_t *G = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
     if (!G) {
@@ -96,15 +95,11 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    printf("still alive :)\n");
-
     dfloat_t *C = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
     if (!C) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-
-    printf("still alive :)\n");
 
     dfloat_t *L = (dfloat_t*)calloc(el_group2_size, sizeof(dfloat_t));
     if (!L) {
@@ -112,15 +107,11 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    printf("still alive :)\n");
-
     dfloat_t *S1 = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
     if (!S1) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-
-    printf("still alive :)\n");
 
     dfloat_t *S2 = (dfloat_t*)calloc(el_group2_size, sizeof(dfloat_t));
     if (!S2) {
@@ -211,7 +202,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 #endif
 
             //use i directly, S2 contains only group2 elements
-            S2[i] = _el->value;
+            //S2[i] = _el->value;
+            mna_vector[n - 1 - i] = _el->value;
 
             break;
         case 'l':
@@ -302,22 +294,39 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     }
 #endif
 
+    //populate MNA Matrix
+
     //ignore ground node
-    for (i=1; i<n-1; ++i) {
+    for (i=1; i<n; ++i) {
+        dfloat_t mna_sum = 0;
+
         struct  node *_node = &netlist->node_pool[i];
+        //printf("~~~~~~~~~~~~~~~~~~~~~    CHECK node %s\n",_node->name);
         for (j=0; j<_node->refs; ++j) {
             struct element *el = _node->attached_el[j]._el;
+            //printf("***    CHECK element %s\n",el->name);
             if (el->type == 'r') {
+                //NOTE: all rows are moved up by one (we ingore the ground node)
                 unsigned long vplus = el->r->vplus.nuid;
                 unsigned long vminus = el->r->vminus.nuid;
                 assert(_node == el->r->vplus._node || _node == el->r->vminus._node);
 
-                mna_vector[vplus*mna_vector_size + vplus] += 1/el->value;
-                mna_vector[vplus*mna_vector_size + vminus] += -1/el->value;
-                mna_vector[vminus*mna_vector_size + vplus] += -1/el->value;
-                mna_vector[vminus*mna_vector_size + vminus] += 1/el->value;
+                dfloat_t value = 1/el->value;
+
+                if (vplus)
+                    mna_matrix[(vplus-1)*mna_dim_size + vplus - 1] += vminus ? value/2 : value;
+
+                if (vminus)
+                    mna_matrix[(vminus-1)*mna_dim_size + vminus - 1] += vplus ? value/2 : value;
+
+                if (vplus && vminus) {
+                    mna_matrix[(vplus-1)*mna_dim_size + vminus - 1] += -value/2;
+                    mna_matrix[(vminus-1)*mna_dim_size + vplus - 1] += -value/2;
+                }
+                //printf("***    playing with %s\n",el->name);
+                //print_dfloat_array(mna_dim_size,mna_dim_size,mna_matrix);
             }
-            if (el->type == 'v' /*|| el->type == 'l'*/) {
+            else if (el->type == 'v' /*|| el->type == 'l'*/) {
                 assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
 
                 //ignore ground node
@@ -327,13 +336,41 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                     dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
 
                     //group2 element, populate A2
-                    mna_vector[row*mna_vector_size + offset + el->idx] = value;
+                    mna_matrix[row*mna_dim_size + offset + el->idx] = value;
 
                     //group2 element, populate A2 transposed
-                    mna_vector[(row + el->idx)*mna_vector_size + row] = value;
+                    mna_matrix[(offset + el->idx)*mna_dim_size + row] = value;
                 }
+                //printf("***    playing with %s\n",el->name);
+                //print_dfloat_array(mna_dim_size,mna_dim_size,mna_matrix);
+            }
+            switch (el->type) {
+            case 'v':
+            case 'l':
+                break;
+            case 'q':
+            case 'm':
+            case 'd':
+                break;
+            case 'i': {
+                assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
+                dfloat_t value = (_node == el->i->vminus._node) ? -1 : 1;
+                unsigned long idx = el->idx;
+                mna_sum += S1[idx] * value;
+                break;
+            }
+            case 'r':
+            case 'c': {
+                assert(_node == el->_rcl->vplus._node || _node == el->_rcl->vminus._node);
+                dfloat_t value = (_node == el->_rcl->vminus._node) ? -1 : 1;
+                unsigned long idx = el->idx;
+                mna_sum += S1[idx] * value;
+                break;
+            }
             }
         }
+        if (mna_sum)
+            mna_vector[i] = -mna_sum;
     }
 
     analysis->n = n-1;
@@ -356,6 +393,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->v = v;
     analysis->u = u;
     analysis->i = i_current;
+    analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
 }
 
@@ -422,7 +460,7 @@ void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p) {
     printf("==============================================\n");
     printf("      ");
     for (j=0; j<col; ++j) {
-        printf("%2lu|",j);
+        printf("%5lu|",j);
     }
     printf("\n     ___________________________________________\n");
 

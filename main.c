@@ -79,11 +79,13 @@ void handle_file(char *filename) {
     print_dfloat_array(analysis.el_group2_size,1,analysis.S2);
 #endif
 
-    unsigned long mna_size = analysis.n + analysis.el_group2_size;
+    unsigned long mna_dim_size = analysis.n + analysis.el_group2_size;
+    printf("\n***    MNA Matrix\n");
+    print_dfloat_array(mna_dim_size,mna_dim_size,analysis.mna_matrix);
     printf("\n***    MNA Vector\n");
-    print_dfloat_array(mna_size,mna_size,analysis.mna_vector);
+    print_dfloat_array(mna_dim_size,1,analysis.mna_vector);
 
-    printf("elements = %lu\n",analysis.e);
+    printf("\nelements = %lu\n",analysis.e);
     printf("nodes = %lu  //without ground\n",analysis.n);
 }
 

@@ -45,6 +45,7 @@ struct analysis_info {
     dfloat_t *i;  //element's current
                   //('el_size' elements)
 
+    dfloat_t *mna_matrix;
     dfloat_t *mna_vector;
 };
 
