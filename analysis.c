@@ -298,7 +298,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     //ignore ground node
     for (i=1; i<n; ++i) {
-        dfloat_t mna_sum = 0;
+        //dfloat_t mna_sum = 0;
 
         struct  node *_node = &netlist->node_pool[i];
         //printf("~~~~~~~~~~~~~~~~~~~~~    CHECK node %s\n",_node->name);
@@ -356,9 +356,11 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 break;
             case 'i': {
                 assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
-                dfloat_t value = (_node == el->i->vminus._node) ? -1 : 1;
                 unsigned long idx = el->idx;
-                mna_sum += S1[idx] * value;
+                dfloat_t value =
+                    (_node == el->i->vminus._node) ? -S1[idx] : S1[idx];
+                //mna_sum += value;
+                mna_vector[i] += value;
                 break;
             }
             case 'r':
@@ -366,8 +368,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 break;
             }
         }
-        if (mna_sum)
-            mna_vector[i] = -mna_sum;
+        //if (mna_sum)
+        //    mna_vector[i] = -mna_sum;
     }
 
     analysis->n = n-1;
