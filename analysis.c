@@ -203,7 +203,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
             //use i directly, S2 contains only group2 elements
             //S2[i] = _el->value;
-            mna_vector[n - 1 - i] = _el->value;
+            //mna_vector[n - 1 + i] = _el->value;
 
             break;
         case 'l':
@@ -346,6 +346,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
             }
             switch (el->type) {
             case 'v':
+                mna_vector[n - 1 + el->idx] = el->value;
+                break;
             case 'l':
                 break;
             case 'q':
@@ -360,13 +362,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 break;
             }
             case 'r':
-            case 'c': {
-                assert(_node == el->_rcl->vplus._node || _node == el->_rcl->vminus._node);
-                dfloat_t value = (_node == el->_rcl->vminus._node) ? -1 : 1;
-                unsigned long idx = el->idx;
-                mna_sum += S1[idx] * value;
+            case 'c':
                 break;
-            }
             }
         }
         if (mna_sum)
