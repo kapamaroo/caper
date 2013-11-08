@@ -10,12 +10,14 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     assert(netlist);
     assert(analysis);
 
-    unsigned long n = netlist->n;
+    //the last node we care
+    //also the number of nodes without considering the ground
+    unsigned long _n = netlist->n - 1;
     unsigned long e = netlist->e;
     unsigned long el_group1_size = netlist->el_group1_size;
     unsigned long el_group2_size = netlist->el_group2_size;
 
-    unsigned long mna_dim_size = n-1 + el_group2_size;
+    unsigned long mna_dim_size = _n + el_group2_size;
     printf("analysis: trying to allocate %lu bytes ...\n",
            mna_dim_size * mna_dim_size * sizeof(dfloat_t));
     dfloat_t *mna_matrix =
@@ -31,7 +33,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    dfloat_t *v = (dfloat_t*)calloc((n-1), sizeof(dfloat_t));
+    dfloat_t *v = (dfloat_t*)calloc((_n), sizeof(dfloat_t));
     if (!v) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -79,7 +81,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     //populate MNA Matrix
 
     //ignore ground node
-    for (i=1; i<n; ++i) {
+    for (i=1; i<=_n; ++i) {
         struct  node *_node = &netlist->node_pool[i];
         for (j=0; j<_node->refs; ++j) {
             struct element *el = _node->attached_el[j]._el;
@@ -111,18 +113,17 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 //ignore ground node
                 if (_node->nuid) {
                     unsigned long row = _node->nuid - 1;
-                    unsigned long offset = n - 1;
                     dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
 
                     //group2 element, populate A2
-                    mna_matrix[row*mna_dim_size + offset + el->idx] = value;
+                    mna_matrix[row*mna_dim_size + _n + el->idx] = value;
 
                     //group2 element, populate A2 transposed
-                    mna_matrix[(offset + el->idx)*mna_dim_size + row] = value;
+                    mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
                 }
             }
             switch (el->type) {
-            case 'v':  mna_vector[n - 1 + el->idx] = el->value;  break;
+            case 'v':  mna_vector[_n + el->idx] = el->value;  break;
             case 'i': {
                 assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
                 //we have -A1*S1, therefore we subtract from the final result
@@ -135,7 +136,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         }
     }
 
-    analysis->n = n-1;
+    analysis->n = _n;
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
     analysis->el_group2_size = el_group2_size;
