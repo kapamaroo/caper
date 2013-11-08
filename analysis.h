@@ -19,17 +19,6 @@ struct analysis_info {
     unsigned long el_group1_size;
     unsigned long el_group2_size;
 
-#if 0
-    char *A;     //nodes x elements array (without the ground node)
-    char *At;    //transposed A
-
-    char *A1;
-    char *A1t;
-
-    char *A2;
-    char *A2t;
-#endif
-
     dfloat_t *G;  //resistance matrix (m1 x m1) diagonal
     dfloat_t *C;  //capacity matrix (m1 x m1) diagonal
     dfloat_t *L;  //self inductor matrix  (m2 x m2) diagonal

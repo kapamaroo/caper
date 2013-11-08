@@ -63,14 +63,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-#if 0
-    char *A = (char*)calloc((n-1) * e, sizeof(char));
-    if (!A) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-#endif
-
     dfloat_t *v = (dfloat_t*)calloc((n-1), sizeof(dfloat_t));
     if (!v) {
         perror(__FUNCTION__);
@@ -125,103 +117,22 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     for (i=0; i<el_group1_size; ++i) {
         struct element *_el = &netlist->el_group1_pool[i];
         unsigned long y = i;
-#if 0
-        unsigned long xplus;
-        unsigned long xminus;
-#endif
         switch (_el->type) {
-        case 'i':
-#if 0
-            xplus = _el->i->vplus.nuid;
-            xminus = _el->i->vminus.nuid;
-            if (xplus)
-                A[(xplus-1) * e + y] = 1;
-            if (xminus)
-                A[(xminus-1) * e + y] = -1;
-#endif
-
-            S1[y] = _el->value;
-
-            break;
-        case 'r':
-#if 0
-            xplus = _el->r->vplus.nuid;
-            xminus = _el->r->vminus.nuid;
-            if (xplus)
-                A[(xplus-1) * e + y] = 1;
-            if (xminus)
-                A[(xminus-1) * e + y] = -1;
-#endif
-
-            G[y] = 1 / _el->value;
-
-            break;
-        case 'c':
-#if 0
-            xplus = _el->c->vplus.nuid;
-            xminus = _el->c->vminus.nuid;
-            if (xplus)
-                A[(xplus-1) * e + y] = 1;
-            if (xminus)
-                A[(xminus-1) * e + y] = -1;
-#endif
-
-            C[y] = _el->value;
-
-            break;
-        case 'q':
-            printf("warning: ignore bjt elements in analysis for now\n");
-            break;
-        case 'm':
-            printf("warning: ignore mos elements in analysis for now\n");
-            break;
-        case 'd':
-            printf("warning: ignore diode elements in analysis for now\n");
-            break;
+        case 'i':  S1[y] =     _el->value;  break;
+        case 'r':   G[y] = 1 / _el->value;  break;
+        case 'c':   C[y] =     _el->value;  break;
         default:
-            assert(0);
+            printf("warning: ignore type '%c' element in analysis\n",_el->type);
+            break;
         }
     }
 
     for (i=0; i<el_group2_size; ++i) {
         struct element *_el = &netlist->el_group2_pool[i];
-#if 0
-        unsigned long y = el_group1_size + i;
-        unsigned long xplus;
-        unsigned long xminus;
-#endif
         switch (_el->type) {
-        case 'v':
-#if 0
-            xplus = _el->v->vplus.nuid;
-            xminus = _el->v->vminus.nuid;
-            if (xplus)
-                A[(xplus-1) * e + y] = 1;
-            if (xminus)
-                A[(xminus-1) * e + y] = -1;
-#endif
-
-            //use i directly, S2 contains only group2 elements
-            //S2[i] = _el->value;
-            //mna_vector[n - 1 + i] = _el->value;
-
-            break;
-        case 'l':
-#if 0
-            xplus = _el->l->vplus.nuid;
-            xminus = _el->l->vminus.nuid;
-            if (xplus)
-                A[(xplus-1) * e + y] = 1;
-            if (xminus)
-                A[(xminus-1) * e + y] = -1;
-#endif
-
-            //use i directly, L contains only group2 elements
-            L[i] = _el->value;
-
-            break;
+        case 'l':  L[i] = _el->value;  break;
         default:
-            assert(0);
+            break;
         }
     }
 
@@ -230,81 +141,13 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     unsigned long j;
 
-#if 0
-    char *At = (char*)malloc((n-1) * e * sizeof(char));
-    if (!At) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    for (i=0; i<n-1; ++i) {
-        for (j=0; j<e; ++j) {
-            At[j*(n-1) + i] = A[i*e + j];
-        }
-    }
-
-    char *A1 = (char*)malloc((n-1) * el_group1_size * sizeof(char));
-    if (!A1) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    for (i=0; i<n-1; ++i) {
-        for (j=0; j<el_group1_size; ++j) {
-            A1[i*el_group1_size + j] = A[i*e + j];
-        }
-    }
-
-    char *A1t = (char*)malloc((n-1) * el_group1_size * sizeof(char));
-    if (!A1t) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    for (i=0; i<n-1; ++i) {
-        for (j=0; j<el_group1_size; ++j) {
-            A1t[j*(n-1) + i] = A1[i*el_group1_size + j];
-        }
-    }
-
-    //create A1 and A1t
-
-    char *A2 = (char*)malloc((n-1) * el_group2_size * sizeof(char));
-    if (!A2) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    for (i=0; i<n-1; ++i) {
-        for (j=0; j<el_group2_size; ++j) {
-            A2[i*el_group2_size + j] = A[i*e + el_group1_size + j];
-        }
-    }
-
-    char *A2t = (char*)malloc((n-1) * el_group2_size * sizeof(char));
-    if (!A2t) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    for (i=0; i<n-1; ++i) {
-        for (j=0; j<el_group2_size; ++j) {
-            A2t[j*(n-1) + i] = A2[i*el_group2_size + j];
-        }
-    }
-#endif
-
     //populate MNA Matrix
 
     //ignore ground node
     for (i=1; i<n; ++i) {
-        //dfloat_t mna_sum = 0;
-
         struct  node *_node = &netlist->node_pool[i];
-        //printf("~~~~~~~~~~~~~~~~~~~~~    CHECK node %s\n",_node->name);
         for (j=0; j<_node->refs; ++j) {
             struct element *el = _node->attached_el[j]._el;
-            //printf("***    CHECK element %s\n",el->name);
             if (el->type == 'r') {
                 //NOTE: all rows are moved up by one (we ingore the ground node)
                 unsigned long vplus = el->r->vplus.nuid;
@@ -314,19 +157,20 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 dfloat_t value = 1/el->value;
 
                 if (vplus)
-                    mna_matrix[(vplus-1)*mna_dim_size + vplus - 1] += vminus ? value/2 : value;
+                    mna_matrix[(vplus-1)*mna_dim_size + vplus - 1]
+                        += vminus ? value/2 : value;
 
                 if (vminus)
-                    mna_matrix[(vminus-1)*mna_dim_size + vminus - 1] += vplus ? value/2 : value;
+                    mna_matrix[(vminus-1)*mna_dim_size + vminus - 1]
+                        += vplus ? value/2 : value;
 
                 if (vplus && vminus) {
                     mna_matrix[(vplus-1)*mna_dim_size + vminus - 1] += -value/2;
                     mna_matrix[(vminus-1)*mna_dim_size + vplus - 1] += -value/2;
                 }
-                //printf("***    playing with %s\n",el->name);
-                //print_dfloat_array(mna_dim_size,mna_dim_size,mna_matrix);
             }
-            else if (el->type == 'v' /*|| el->type == 'l'*/) {
+            else if (el->type == 'v') {
+                //ignore 'l' elements
                 assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
 
                 //ignore ground node
@@ -341,49 +185,25 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                     //group2 element, populate A2 transposed
                     mna_matrix[(offset + el->idx)*mna_dim_size + row] = value;
                 }
-                //printf("***    playing with %s\n",el->name);
-                //print_dfloat_array(mna_dim_size,mna_dim_size,mna_matrix);
             }
             switch (el->type) {
-            case 'v':
-                mna_vector[n - 1 + el->idx] = el->value;
-                break;
-            case 'l':
-                break;
-            case 'q':
-            case 'm':
-            case 'd':
-                break;
+            case 'v':  mna_vector[n - 1 + el->idx] = el->value;  break;
             case 'i': {
                 assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
-                unsigned long idx = el->idx;
-                dfloat_t value =
-                    (_node == el->i->vminus._node) ? -S1[idx] : S1[idx];
-                //mna_sum += value;
-                mna_vector[i] += value;
+                mna_vector[i] += (_node == el->i->vminus._node)
+                    ? -S1[el->idx]
+                    :  S1[el->idx];
                 break;
             }
-            case 'r':
-            case 'c':
-                break;
+            default:  break;
             }
         }
-        //if (mna_sum)
-        //    mna_vector[i] = -mna_sum;
     }
 
     analysis->n = n-1;
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
     analysis->el_group2_size = el_group2_size;
-#if 0
-    analysis->A = A;
-    analysis->At = At;
-    analysis->A1 = A1;
-    analysis->A1t = A1t;
-    analysis->A2 = A2;
-    analysis->A2t = A2t;
-#endif
     analysis->G = G;
     analysis->C = C;
     analysis->L = L;
