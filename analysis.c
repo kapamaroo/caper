@@ -190,9 +190,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
             case 'v':  mna_vector[n - 1 + el->idx] = el->value;  break;
             case 'i': {
                 assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
-                mna_vector[i] += (_node == el->i->vminus._node)
-                    ? -S1[el->idx]
-                    :  S1[el->idx];
+                //we have -A1*S1, therefore we subtract from the final result
+                mna_vector[i] -=
+                    (_node == el->i->vminus._node) ? -el->value :  el->value;
                 break;
             }
             default:  break;
