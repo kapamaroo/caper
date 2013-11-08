@@ -58,7 +58,7 @@ void handle_file(char *filename) {
 #endif
 
     struct analysis_info analysis;
-    analyse_kvl(&netlist,&analysis);
+    analyse_mna(&netlist,&analysis);
 
 #if 0
     printf("\n***    A\n");

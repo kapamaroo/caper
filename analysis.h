@@ -32,8 +32,6 @@ struct analysis_info {
     dfloat_t *mna_vector;
 };
 
-void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis);
-void analyse_kcl(struct netlist_info *netlist, struct analysis_info *analysis);
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
 
 void print_int_array(unsigned long row, unsigned long col, int *p);

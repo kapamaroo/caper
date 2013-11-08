@@ -148,15 +148,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->mna_vector = mna_vector;
 }
 
-void analyse_kvl(struct netlist_info *netlist, struct analysis_info *analysis) {
-    analysis_init(netlist,analysis);
-}
-
-void analyse_kcl(struct netlist_info *netlist, struct analysis_info *analysis) {
-    analysis_init(netlist,analysis);
-
-}
-
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     analysis_init(netlist,analysis);
 
