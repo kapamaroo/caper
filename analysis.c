@@ -6,39 +6,6 @@
 #include <errno.h>
 #include <limits.h>
 
-enum connection_type get_conn_type(unsigned long annotated_id) {
-    //throw the CONN_EL_GROUP_BITS
-    annotated_id >>= CONN_EL_GROUP_BITS;
-    unsigned long bits = annotated_id & (unsigned long)CONN_TYPE_MASK;
-    assert(bits <= CONN_LAST_TYPE);
-    enum connection_type type = (enum connection_type) bits;
-    return type;
-}
-
-enum connection_el_group get_conn_el_group(unsigned long annotated_id) {
-    unsigned long bits = annotated_id & CONN_EL_GROUP_MASK;
-    enum connection_el_group group = (enum connection_el_group) bits;
-    return group;
-}
-
-unsigned long get_conn_raw_id(unsigned long annotated_id) {
-    return annotated_id >> CONN_INFO_BITS;
-}
-
-unsigned long set_conn_info(unsigned long id, enum connection_type conn_type,
-                            char el_type) {
-    //the first CONN_INFO_BITS of id must be empty!
-    assert(!(id >> (sizeof(unsigned long) * CHAR_BIT - CONN_INFO_BITS)));
-
-    enum connection_el_group group = CONN_EL_GROUP1;
-    if (el_type == 'v' || el_type == 'l')
-        group = CONN_EL_GROUP2;
-
-    unsigned long annotated_id = (id << CONN_TYPE_BITS) | (unsigned long)conn_type;
-    annotated_id = (annotated_id << CONN_EL_GROUP_BITS) | (unsigned long)group;
-    return annotated_id;
-}
-
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
     assert(netlist);
     assert(analysis);
@@ -51,7 +18,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     unsigned long mna_dim_size = n-1 + el_group2_size;
     printf("analysis: trying to allocate %lu bytes ...\n",
            mna_dim_size * mna_dim_size * sizeof(dfloat_t));
-    dfloat_t *mna_matrix = (dfloat_t*)calloc(mna_dim_size * mna_dim_size,sizeof(dfloat_t));
+    dfloat_t *mna_matrix =
+        (dfloat_t*)calloc(mna_dim_size * mna_dim_size,sizeof(dfloat_t));
     if (!mna_matrix) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -75,18 +43,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    dfloat_t *i_current = (dfloat_t*)calloc(e, sizeof(dfloat_t));
-    if (!i_current) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    dfloat_t *G = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
-    if (!G) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
     dfloat_t *C = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
     if (!C) {
         perror(__FUNCTION__);
@@ -99,31 +55,14 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    dfloat_t *S1 = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
-    if (!S1) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    dfloat_t *S2 = (dfloat_t*)calloc(el_group2_size, sizeof(dfloat_t));
-    if (!S2) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
     printf("analysis: populating matrices ...\n");
 
     unsigned long i;
     for (i=0; i<el_group1_size; ++i) {
         struct element *_el = &netlist->el_group1_pool[i];
-        unsigned long y = i;
         switch (_el->type) {
-        case 'i':  S1[y] =     _el->value;  break;
-        case 'r':   G[y] = 1 / _el->value;  break;
-        case 'c':   C[y] =     _el->value;  break;
-        default:
-            printf("warning: ignore type '%c' element in analysis\n",_el->type);
-            break;
+        case 'c':   C[i] =     _el->value;  break;
+        default:                            break;
         }
     }
 
@@ -131,13 +70,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         struct element *_el = &netlist->el_group2_pool[i];
         switch (_el->type) {
         case 'l':  L[i] = _el->value;  break;
-        default:
-            break;
+        default:                       break;
         }
     }
-
-    //create A1 and A1t
-    printf("analysis: creating A1, A2 and transposed matrices ...\n");
 
     unsigned long j;
 
@@ -204,14 +139,10 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
     analysis->el_group2_size = el_group2_size;
-    analysis->G = G;
     analysis->C = C;
     analysis->L = L;
-    analysis->S1 = S1;
-    analysis->S2 = S2;
     analysis->v = v;
     analysis->u = u;
-    analysis->i = i_current;
     analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
 }
