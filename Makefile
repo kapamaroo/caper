@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -g
+CFLAGS=-Wall -g -lgsl -lgslcblas
 #CFLAGS=-Wall -O3 -march=native
 DEPS = parser.h datatypes.h analysis.h hash.h
 OBJ = main.o parser.o analysis.o hash.o

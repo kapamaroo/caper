@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <gsl/gsl_linalg.h>
 
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
     assert(netlist);
@@ -34,6 +35,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     }
 
     dfloat_t *x = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    //dfloat_t *x = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
     if (!x) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -155,9 +157,38 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->x = x;
 }
 
+void solve_LU(struct analysis_info *analysis) {
+    unsigned long mna_dim_size =
+        analysis->n + analysis->el_group2_size;
+
+    //GSL magic
+    gsl_matrix_view Aview =
+        gsl_matrix_view_array(analysis->mna_matrix,
+                              mna_dim_size,
+                              mna_dim_size);
+
+    gsl_vector_view bview =
+        gsl_vector_view_array(analysis->mna_vector,
+                              mna_dim_size);
+
+    gsl_vector_view x =
+        gsl_vector_view_array(analysis->x,
+                              mna_dim_size);
+
+    gsl_permutation *perm = gsl_permutation_alloc(mna_dim_size);
+
+    int perm_sign;
+    gsl_linalg_LU_decomp(&Aview.matrix,perm,&perm_sign);
+    gsl_linalg_LU_solve(&Aview.matrix,perm,&bview.vector,&x.vector);
+}
+
+void solve_cholesky(struct analysis_info *analysis) {
+    //TODO
+}
+
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     analysis_init(netlist,analysis);
-
+    solve_LU(analysis);
 }
 
 void print_int_array(unsigned long row, unsigned long col, int *p) {
