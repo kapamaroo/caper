@@ -1,3 +1,5 @@
+*implement cholesky solver
+
 * use cholesky solver with the 'spd' option
 *.option spd
 
