@@ -28,6 +28,8 @@ struct analysis_info {
     dfloat_t *u;  //element's voltage from vplus(+) to vminus(-) nodes
                   //('el_size' elements)
 
+    dfloat_t *x;  //solution vector
+
     dfloat_t *mna_matrix;
     dfloat_t *mna_vector;
 };

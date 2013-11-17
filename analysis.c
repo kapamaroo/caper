@@ -33,6 +33,12 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
+    dfloat_t *x = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!x) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
     dfloat_t *v = (dfloat_t*)calloc((_n), sizeof(dfloat_t));
     if (!v) {
         perror(__FUNCTION__);
@@ -146,6 +152,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->u = u;
     analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
+    analysis->x = x;
 }
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
