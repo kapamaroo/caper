@@ -85,6 +85,10 @@ void handle_file(char *filename) {
     printf("\n***    MNA Vector\n");
     print_dfloat_array(mna_dim_size,1,analysis.mna_vector);
 
+    printf("\n***    Solution Vector (x)\n");
+    print_dfloat_array(analysis.n + analysis.el_group2_size,
+                       1,analysis.x);
+
     printf("\nelements = %lu\n",analysis.e);
     printf("nodes = %lu  //without ground\n",analysis.n);
 }
