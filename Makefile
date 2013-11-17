@@ -8,7 +8,7 @@ OBJ = main.o parser.o analysis.o hash.o
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 caper: $(OBJ)
-	gcc -o $@ $^ $(CFLAGS_RELEASE)
+	gcc -o $@ $^ $(CFLAGS)
 
 
 .PHONY: clean
