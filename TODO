@@ -1,0 +1,15 @@
+* use cholesky solver with the 'spd' option
+*.option spd
+
+*add parser features
+
+*    Stepping
+*.dc <input_variable> <start_value> <end_value> <step>
+*Example
+*.dc v1 0 3 .01
+
+*    Plot
+*.plot v(<node_name>)
+*.print v(<node_name>)
+*
+* each node to separate file
