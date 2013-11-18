@@ -37,10 +37,18 @@ enum cmd_option_type {
 #define CMD_SIZE (CMD_PRINT + 1)
 #define CMD_OPT_SIZE (CMD_OPT_SPD + 1)
 
+struct cmd_dc {
+    char type;  //this may be 'v' for voltage or 'i' for current
+    dfloat_t begin;
+    dfloat_t end;
+    dfloat_t step;
+};
+
 struct command {
     enum cmd_type type;
     union {
         enum cmd_option_type option_type;
+        struct cmd_dc dc;
     };
 };
 

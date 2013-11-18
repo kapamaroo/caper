@@ -906,6 +906,55 @@ void parse_command(char **buf) {
         break;
     }
     case CMD_DC: {
+        char *name = parse_string(buf,"dc voltage source");
+        struct element *dc_source = NULL;
+        unsigned long i;
+        for (i=0; i<el_group2_pool_next; ++i) {
+            struct element *el = &el_group2_pool[i];
+            if (el->type == 'v' && strcmp(el->name,name) == 0) {
+                dc_source = el;
+                break;
+            }
+        }
+        if (!dc_source) {
+            printf("***  WARNING  ***    Unknown dc source '%s' - error\n",name);
+            free(name);
+            discard_line(buf);
+            parse_eat_whitechars(buf);
+            return;
+        }
+
+        char dc_type = name[0];
+        assert(dc_type == 'v' || dc_type == 'i');
+
+        dfloat_t begin = parse_value(buf,NULL,"dc start value");
+        dfloat_t end = parse_value(buf,NULL,"dc stop value");
+        dfloat_t step = parse_value(buf,NULL,"dc step value");
+
+        //perform some sanity checks
+
+        int error = 0;
+
+        if (step == 0)
+            error = 1;
+        if (begin < end && step < 0)
+            error = 1;
+        if (begin > end && step > 0)
+            error = 1;
+
+        if (error) {
+            printf("error: dc step cannot be zero\n");
+            free(name);
+            discard_line(buf);
+            parse_eat_whitechars(buf);
+            return;
+        }
+
+        new_cmd.dc.type = dc_type;
+        new_cmd.dc.begin = begin;
+        new_cmd.dc.end = end;
+        new_cmd.dc.step = step;
+
         break;
     }
     case CMD_PLOT:
