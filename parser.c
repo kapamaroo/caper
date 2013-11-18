@@ -809,8 +809,14 @@ void parse_comment(char **buf) {
         *buf = NULL;
 }
 
-static inline int command_is(char *command, char *type) {
-    return (strcmp(command,type) == 0);
+static const char *cmd_pool[] = { "option", "dc", "plot", "print" };
+
+static inline enum cmd_type get_cmd_type(char *cmd) {
+    int i;
+    for (i=0; i<CMD_SIZE; ++i)
+        if (strcmp(cmd, cmd_pool[i]) == 0)
+            return (enum cmd_type)i;
+    return (enum cmd_type)i;
 }
 
 void parse_command(char **buf) {
@@ -820,7 +826,11 @@ void parse_command(char **buf) {
     (*buf)++;
 
 #if 0
+    char *cmd = parse_string(**buf,"command name");
+    if (cmd_is(cmd,"option")) {
 
+    }
+    else if () {}
 #else
     printf("***  WARNING  ***    command parsing is not implemented yet! - skip command\n");
     char *end = current_input->raw_end;

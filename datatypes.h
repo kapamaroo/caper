@@ -21,6 +21,16 @@ enum connection_type {
     CONN_MOS_B
 };
 
+enum cmd_type {
+    CMD_OPTION = 0,
+    CMD_DC,
+    CMD_PLOT,
+    CMD_PRINT,
+    CMD_BAD_OPTION
+};
+
+#define CMD_SIZE (CMD_PRINT + 1)
+
 struct container_element;
 
 struct node {
