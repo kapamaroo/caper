@@ -183,12 +183,47 @@ void solve_LU(struct analysis_info *analysis) {
 }
 
 void solve_cholesky(struct analysis_info *analysis) {
-    //TODO
+    unsigned long mna_dim_size =
+        analysis->n + analysis->el_group2_size;
+
+    //GSL magic
+    gsl_matrix_view Aview =
+        gsl_matrix_view_array(analysis->mna_matrix,
+                              mna_dim_size,
+                              mna_dim_size);
+
+    gsl_vector_view bview =
+        gsl_vector_view_array(analysis->mna_vector,
+                              mna_dim_size);
+
+    gsl_vector_view x =
+        gsl_vector_view_array(analysis->x,
+                              mna_dim_size);
+
+    gsl_linalg_cholesky_decomp(&Aview.matrix);
+    gsl_linalg_cholesky_solve(&Aview.matrix,&bview.vector,&x.vector);
+}
+
+static int get_cmd_opt(struct command *pool, unsigned int size,
+                       enum cmd_option_type option_type) {
+    unsigned int i;
+    for (i=0; i<size; ++i)
+        if (pool[i].type == CMD_OPTION &&
+            pool[i].option_type == option_type)
+            return 1;
+    return 0;
 }
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     analysis_init(netlist,analysis);
-    solve_LU(analysis);
+
+    int use_cholesky = get_cmd_opt(netlist->cmd_pool,
+                                   netlist->cmd_pool_size,
+                                   CMD_OPT_SPD);
+    if (use_cholesky)
+        solve_cholesky(analysis);
+    else
+        solve_LU(analysis);
 }
 
 void print_int_array(unsigned long row, unsigned long col, int *p) {
