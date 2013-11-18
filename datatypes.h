@@ -21,40 +21,6 @@ enum connection_type {
     CONN_MOS_B
 };
 
-#define CONN_LAST_TYPE CONN_MOS_B
-#define CONN_TYPE_BITS 4
-#define CONN_TYPE_MASK ((1 << (CONN_TYPE_BITS)) - 1)
-
-enum connection_el_group {
-    CONN_EL_GROUP1 = 0,
-    CONN_EL_GROUP2
-};
-
-#define CONN_EL_GROUP_BITS 1
-#define CONN_EL_GROUP_MASK ((1 << (CONN_EL_GROUP_BITS)) - 1)
-
-struct connection_info {
-    enum connection_type type;
-    enum connection_el_group group;
-};
-
-#define CONN_INFO_BITS (CONN_TYPE_BITS + CONN_EL_GROUP_BITS)
-#define CONN_INFO_MASK (((CONN_TYPE_MASK) << (CONN_EL_GROUP_BITS)) \
-                        | (CONN_EL_GROUP_MASK))
-
-/*
-  |            sizeof(unsigned long)             |
-   ----------------------------------------------
-  |  uid  | CONN_TYPE_BITS | CONN_EL_GROUP_BITS  |
-   ----------------------------------------------
-*/
-
-enum connection_type get_conn_type(unsigned long annotated_id);
-enum connection_el_group get_conn_el_group(unsigned long annotated_id);
-unsigned long get_conn_raw_id(unsigned long annotated_id);
-unsigned long set_conn_info(unsigned long id, enum connection_type conn_type,
-                            char el_type);
-
 struct container_element;
 
 struct node {
