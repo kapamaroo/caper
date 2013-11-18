@@ -26,10 +26,23 @@ enum cmd_type {
     CMD_DC,
     CMD_PLOT,
     CMD_PRINT,
-    CMD_BAD_OPTION
+    CMD_BAD_COMMAND
+};
+
+enum cmd_option_type {
+    CMD_OPT_SPD = 0,
+    CMD_OPT_BAD_OPTION
 };
 
 #define CMD_SIZE (CMD_PRINT + 1)
+#define CMD_OPT_SIZE (CMD_OPT_SPD + 1)
+
+struct command {
+    enum cmd_type type;
+    union {
+        enum cmd_option_type option_type;
+    };
+};
 
 struct container_element;
 
@@ -151,6 +164,9 @@ struct netlist_info {
     struct node *node_pool;
     struct element *el_group1_pool;
     struct element *el_group2_pool;
+
+    unsigned int cmd_pool_size;
+    struct command *cmd_pool;
 };
 
 #endif

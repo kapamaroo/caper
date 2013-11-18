@@ -36,6 +36,7 @@ struct file_info *current_input = NULL;
 
 #define INIT_EL_POOL_SIZE 1
 #define INIT_NODE_POOL_SIZE 1
+#define INIT_CMD_POOL_SIZE 16
 
 #if INIT_NODE_POOL_SIZE < 1
 #error node pool size must be at least 1
@@ -59,6 +60,10 @@ struct node *node_pool = NULL;
 
 static unsigned int node_hash_size = 1013;
 struct hash_table *node_hash_table = NULL;
+
+static unsigned int cmd_pool_size = INIT_CMD_POOL_SIZE;
+static unsigned int cmd_pool_next = 0;
+static struct command *cmd_pool = NULL;
 
 static inline void rebuild() {
     unsigned long i;
@@ -487,6 +492,21 @@ void parser_init() {
     ground->refs = 0;
     ground->el_size = 0;
     ground->attached_el = NULL;
+
+    cmd_pool_size = INIT_CMD_POOL_SIZE;
+    cmd_pool_next = 0;
+
+#if 0
+    //do NOT free cmd_pool, it is going to be used by analysis later
+    if (cmd_pool)
+        free(cmd_pool);
+#endif
+
+    cmd_pool = (struct command*)malloc(cmd_pool_size * sizeof(struct command));
+    if (!cmd_pool) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
 }
 
 int is_semantically_correct() {
@@ -571,6 +591,8 @@ void parse_file(const char *filename, struct netlist_info *netlist) {
     netlist->node_pool = node_pool;
     netlist->el_group1_pool = el_group1_pool;
     netlist->el_group2_pool = el_group2_pool;
+    netlist->cmd_pool_size = cmd_pool_next;
+    netlist->cmd_pool = cmd_pool;
 }
 
 void parse_eat_whitechars(char **buf) {
@@ -815,14 +837,35 @@ void parse_comment(char **buf) {
         *buf = NULL;
 }
 
-static const char *cmd_pool[] = { "option", "dc", "plot", "print" };
+//these must be in the same order as in the enum cmd_type in datatypes.h
+static const char *cmd_base[] = { "option", "dc", "plot", "print" };
+
+//these must be in the same order as in the enum cmd_opt_type in datatypes.h
+static const char *cmd_opt_base[] = { "spd" };
 
 static inline enum cmd_type get_cmd_type(char *cmd) {
     int i;
     for (i=0; i<CMD_SIZE; ++i)
-        if (strcmp(cmd, cmd_pool[i]) == 0)
+        if (strcmp(cmd, cmd_base[i]) == 0)
             return (enum cmd_type)i;
-    return (enum cmd_type)i;
+    return CMD_BAD_COMMAND;
+}
+
+static inline enum cmd_option_type get_cmd_opt_type(char *opt) {
+    int i;
+    for (i=0; i<CMD_OPT_SIZE; ++i)
+        if (strcmp(opt, cmd_opt_base[i]) == 0)
+            return (enum cmd_option_type)i;
+    return CMD_OPT_BAD_OPTION;
+}
+
+static void discard_line(char **buf) {
+    char *end = current_input->raw_end;
+    while (*buf != end) {
+        if (**buf == '\n')
+            break;
+        (*buf)++;
+    }
 }
 
 void parse_command(char **buf) {
@@ -831,21 +874,51 @@ void parse_command(char **buf) {
     /* eat '.' */
     (*buf)++;
 
-#if 0
-    char *cmd = parse_string(**buf,"command name");
-    if (cmd_is(cmd,"option")) {
+    char *cmd = parse_string(buf,"command name");
+    enum cmd_type type = get_cmd_type(cmd);
 
+    if (type == CMD_BAD_COMMAND) {
+        printf("***  WARNING  ***    Unknown command '%s' - error\n",cmd);
+        free(cmd);
+        discard_line(buf);
+        parse_eat_whitechars(buf);
+        return;
     }
-    else if () {}
-#else
-    printf("***  WARNING  ***    command parsing is not implemented yet! - skip command\n");
-    char *end = current_input->raw_end;
-    while (*buf != end) {
-        if (**buf == '\n')
+
+    struct command new_cmd = {.type=type};
+
+    switch (type) {
+    case CMD_OPTION: {
+        char *opt = parse_string(buf,".option argument");
+        enum cmd_option_type opt_type = get_cmd_opt_type(opt);
+
+        switch (opt_type) {
+        case CMD_OPT_BAD_OPTION:
+            printf("***  WARNING  ***    Unknown .option argument '%s' - error\n",opt);
+            free(opt);
+            discard_line(buf);
+            parse_eat_whitechars(buf);
+            return;
+        case CMD_OPT_SPD:
+            new_cmd.option_type = opt_type;
             break;
-        (*buf)++;
+        }
+        break;
     }
-#endif
+    case CMD_DC: {
+        break;
+    }
+    case CMD_PLOT:
+    case CMD_PRINT: {
+        break;
+    }
+    default:  assert(0);
+    }
+
+    cmd_pool_size = grow((void**)&cmd_pool,cmd_pool_size,
+                         sizeof(struct command),cmd_pool_next,NO_REBUILD);
+    cmd_pool[cmd_pool_next] = new_cmd;
+    cmd_pool_next++;
 
     parse_eat_whitechars(buf);
 }
