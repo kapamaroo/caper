@@ -328,7 +328,9 @@ static inline struct element *get_new_element(char type) {
     case 'm':  size = sizeof(struct _mos_);      break;
     case 'q':  size = sizeof(struct _bjt_);      break;
     case 'd':  size = sizeof(struct _diode_);    break;
-    default:   assert(0);
+    default:
+        printf("debug: type=0x%2x (hex ascii)\n",type);
+        assert(0);
     }
 
     assert(size);
@@ -593,6 +595,10 @@ void parse_eat_newline(char **buf) {
 
     char *end = current_input->raw_end;
     while (*buf != end) {
+        if (**buf == '\r') {
+            (*buf)++;
+            continue;
+        }
         if (**buf != '\n') {
             break;
         }
