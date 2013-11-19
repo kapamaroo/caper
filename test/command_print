@@ -1,0 +1,16 @@
+v1 0 3 6
+
+.print v(0)
+.print v (0)
+.print v( 0)
+.print v(0 )
+.print v ( 0 )
+
+.print v(0)
+
+.print v(0
+.print v(
+.print v
+.print
+
+.print v(0) v(0)
