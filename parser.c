@@ -493,6 +493,15 @@ void parser_init() {
     ground->el_size = 0;
     ground->attached_el = NULL;
 
+    struct container_node *_cground = (struct container_node*)malloc(sizeof(struct container_node));
+    if (!_cground) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+    _cground->nuid = ground->nuid;
+    _cground->_node = ground;
+    hash_insert(node_hash_table,ground->name,_cground);
+
     cmd_pool_size = INIT_CMD_POOL_SIZE;
     cmd_pool_next = 0;
 
@@ -645,13 +654,61 @@ void parse_line(char **buf) {
 }
 
 inline static int isdelimiter(char c) {
-    return isspace(c); // && c != '\n';
+    if (isspace(c))
+        return 1;
+    if (isalnum(c))
+        return 0;
+
+    //custom ispunct()
+    switch (c) {
+    case '!':
+    case '"':
+    case '#':
+        return 1;
+    case '$':
+        return 0;
+    case '%':
+    case '&':
+    case 0x27:
+    case '(':
+    case ')':
+    case '*':
+    case '+':
+    case ',':
+        return 1;
+    case '-':
+        return 0;
+    case '.':
+    case '/':
+    case ':':
+    case ';':
+    case '<':
+    case '=':
+    case '>':
+    case '?':
+    case '@':
+    case '[':
+    case '\\':
+    case ']':
+    case '^':
+          return 1;
+    case '_':
+        return 0;
+    case '`':
+    case '{':
+    case '|':
+    case '}':
+    case '~':
+        return 1;
+    }
+
+    return 1;
 }
 
 char *parse_string(char **buf, char *info) {
     //printf("in function: %s\n",__FUNCTION__);
 
-    if (!*buf || isspace(**buf)) {
+    if (!*buf || isdelimiter(**buf)) {
         printf("error: expected %s - exit.\n",info);
         exit(EXIT_FAILURE);
     }
@@ -688,6 +745,35 @@ char *parse_string(char **buf, char *info) {
 
     //printf("out of function: %s\n",__FUNCTION__);
     return name;
+}
+
+char parse_char(char **buf, char *patterns, char *info) {
+    assert(patterns && strlen(patterns));
+
+    char *end = current_input->raw_end;
+    if (*buf == end)
+        *buf = NULL;
+    if (!*buf) {
+        printf("error: expected %s - exit.\n",info);
+        exit(EXIT_FAILURE);
+    }
+
+    char c = tolower(**buf);
+    (*buf)++;
+
+    char *p = patterns;
+    while (*p != '\0' && c != tolower(*p))
+        p++;
+
+    if (*p == '\0') {
+        printf("error: parsing %s, expected '%s' got '%c' 0x%02x (hex ascii) - exit\n",
+               info,patterns,c,c);
+        exit(EXIT_FAILURE);
+    }
+
+    parse_eat_whitechars(buf);
+
+    return c;
 }
 
 dfloat_t parse_value(char **buf, char *prefix, char *info) {
@@ -906,16 +992,30 @@ void parse_command(char **buf) {
         break;
     }
     case CMD_DC: {
-        char *name = parse_string(buf,"dc voltage source");
-        struct element *dc_source = NULL;
+        char *name = parse_string(buf,"dc source");
         unsigned long i;
-        for (i=0; i<el_group2_pool_next; ++i) {
-            struct element *el = &el_group2_pool[i];
-            if (el->type == 'v' && strcmp(el->name,name) == 0) {
-                dc_source = el;
-                break;
+
+        char dc_type = name[0];
+        assert(dc_type == 'v' || dc_type == 'i');
+
+        struct element *dc_source = NULL;
+        if (dc_type == 'v')
+            for (i=0; i<el_group2_pool_next; ++i) {
+                struct element *el = &el_group2_pool[i];
+                if (el->type == 'v' && strcmp(el->name,name) == 0) {
+                    dc_source = el;
+                    break;
+                }
             }
-        }
+        else
+            for (i=0; i<el_group1_pool_next; ++i) {
+                struct element *el = &el_group1_pool[i];
+                if (el->type == 'i' && strcmp(el->name,name) == 0) {
+                    dc_source = el;
+                    break;
+                }
+            }
+
         if (!dc_source) {
             printf("***  WARNING  ***    Unknown dc source '%s' - error\n",name);
             free(name);
@@ -923,9 +1023,6 @@ void parse_command(char **buf) {
             parse_eat_whitechars(buf);
             return;
         }
-
-        char dc_type = name[0];
-        assert(dc_type == 'v' || dc_type == 'i');
 
         dfloat_t begin = parse_value(buf,NULL,"dc start value");
         dfloat_t end = parse_value(buf,NULL,"dc stop value");
@@ -935,15 +1032,20 @@ void parse_command(char **buf) {
 
         int error = 0;
 
-        if (step == 0)
+        if (step == 0) {
             error = 1;
-        if (begin < end && step < 0)
+            printf("error: dc step cannot be zero\n");
+        }
+        if (begin < end && step < 0) {
             error = 1;
-        if (begin > end && step > 0)
+            printf("error: expected positive dc step\n");
+        }
+        if (begin > end && step > 0) {
             error = 1;
+            printf("error: expected negative dc step\n");
+        }
 
         if (error) {
-            printf("error: dc step cannot be zero\n");
             free(name);
             discard_line(buf);
             parse_eat_whitechars(buf);
@@ -959,6 +1061,35 @@ void parse_command(char **buf) {
     }
     case CMD_PLOT:
     case CMD_PRINT: {
+        char el_type = parse_char(buf,"vi","plot type");
+        assert(el_type == 'v' || el_type == 'i');
+
+        parse_eat_whitechars(buf);
+        parse_char(buf,"(","lparen");
+        parse_eat_whitechars(buf);
+
+        char *node_name = parse_string(buf,"node name");
+        if (el_type == 'v') {
+            struct container_node *_cnode = hash_get(node_hash_table,node_name);
+            if (!_cnode) {
+                printf("error: node '%s' not found - exit\n",node_name);
+                free(node_name);
+                exit(EXIT_FAILURE);
+            }
+            //TODO: populate new_cmd
+        }
+        else {
+            //TODO: search elements
+            //      we need hash tables for elements for faster searches
+            assert(0 && "plot/print of current values is not supported yet!");
+        }
+
+        parse_eat_whitechars(buf);
+        parse_char(buf,")","rparen");
+        parse_eat_whitechars(buf);
+
+        //TODO: allow multiple nodes/elements in print/plot
+
         break;
     }
     default:  assert(0);

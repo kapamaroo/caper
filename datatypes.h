@@ -37,6 +37,27 @@ enum cmd_option_type {
 #define CMD_SIZE (CMD_PRINT + 1)
 #define CMD_OPT_SIZE (CMD_OPT_SPD + 1)
 
+struct container_node;
+struct container_element;
+
+struct cmd_plot {
+    char type;
+    union {
+        struct container_node *c_node;
+        struct container_element *c_el;
+    };
+    char *logfile;
+};
+
+struct cmd_print {
+    char type;
+    union {
+        struct container_node *c_node;
+        struct container_element *c_el;
+    };
+    char *logfile;
+};
+
 struct cmd_dc {
     char type;  //this may be 'v' for voltage or 'i' for current
     dfloat_t begin;
@@ -49,10 +70,10 @@ struct command {
     union {
         enum cmd_option_type option_type;
         struct cmd_dc dc;
+        struct cmd_plot plot;
+        struct cmd_print print;
     };
 };
-
-struct container_element;
 
 struct node {
     unsigned long nuid;
