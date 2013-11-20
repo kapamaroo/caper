@@ -223,25 +223,6 @@ static inline struct container_node parse_node(char **buf, struct element *el,
     struct node *_node = NULL;
     struct container_node *_cnode = NULL;
 
-#if 0
-    unsigned long i;
-    for (i=1; i<node_pool_next; ++i) {
-        _node = &node_pool[i];
-        if (strcmp(_node->name,name) == 0) {
-            free(name);
-            _node->el_size = grow((void**)&_node->attached_el,_node->el_size,
-                                  sizeof(struct container_element),_node->refs,
-                                  NO_REBUILD);
-            _node->attached_el[_node->refs].type = el->type;
-            _node->attached_el[_node->refs].idx = el->idx;
-            _node->attached_el[_node->refs]._el = el;
-            _node->refs++;
-
-            struct container_node container = { .nuid=_node->nuid, ._node=_node };
-            return container;
-        }
-    }
-#else
     _cnode = hash_get(node_hash_table,name);
     if (_cnode) {
         _node = _cnode->_node;
@@ -259,8 +240,6 @@ static inline struct container_node parse_node(char **buf, struct element *el,
         return container;
     }
 
-#endif
-
     /* check if we need to resize the pool */
     node_pool_size = grow((void**)&node_pool,node_pool_size,
                           sizeof(struct node),node_pool_next,SHOULD_REBUILD);
@@ -268,7 +247,6 @@ static inline struct container_node parse_node(char **buf, struct element *el,
     unsigned long _nuid = __nuid__++;
     _node = &node_pool[node_pool_next++];
 
-#if 1
     _cnode = (struct container_node*)malloc(sizeof(struct container_node));
     if (!_cnode) {
         perror(__FUNCTION__);
@@ -278,7 +256,6 @@ static inline struct container_node parse_node(char **buf, struct element *el,
     _cnode->_node = _node;
 
     hash_insert(node_hash_table,name,_cnode);
-#endif
 
     _node->nuid = _nuid;
     _node->name = name;
