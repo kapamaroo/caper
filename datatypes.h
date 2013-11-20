@@ -1,6 +1,8 @@
 #ifndef __DATATYPES_H__
 #define __DATATYPES_H__
 
+#include <stdio.h>
+
 #define PRECISION_DOUBLE
 
 #ifdef PRECISION_DOUBLE
@@ -71,6 +73,7 @@ struct cmd_print_plot {
     unsigned int item_num;
     struct cmd_print_plot_item item[MAX_PRINT_PLOT_ITEMS];
     char *logfile;
+    FILE *f;
 };
 
 struct cmd_dc {
@@ -197,7 +200,7 @@ struct netlist_info {
     struct element *el_group1_pool;
     struct element *el_group2_pool;
 
-    unsigned int cmd_pool_size;
+    unsigned long cmd_pool_size;
     struct command *cmd_pool;
 };
 

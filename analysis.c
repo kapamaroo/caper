@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <string.h>
 #include <gsl/gsl_linalg.h>
 
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
@@ -204,14 +205,180 @@ void solve_cholesky(struct analysis_info *analysis) {
     gsl_linalg_cholesky_solve(&Aview.matrix,&bview.vector,&x.vector);
 }
 
-static int get_cmd_opt(struct command *pool, unsigned int size,
+static int get_cmd_opt(struct command *pool, unsigned long size,
                        enum cmd_option_type option_type) {
-    unsigned int i;
+    unsigned long i;
     for (i=0; i<size; ++i)
         if (pool[i].type == CMD_OPTION &&
             pool[i].option_type == option_type)
             return 1;
     return 0;
+}
+
+static void write_result(FILE *f, struct cmd_print_plot_item *item, struct analysis_info *analysis) {
+    dfloat_t value = 0;
+    char *name = NULL;
+
+    assert(item->type == 'v' || item->type == 'i');
+    if (item->type == 'v') {
+        name = item->cnode._node->name;
+        unsigned long idx = item->cnode._node->nuid;
+        //ground node is always 0
+        if (idx)
+            value = analysis->x[idx - 1];
+    }
+    else {
+        name = item->cel._el->name;
+        unsigned long idx = analysis->n + item->cel._el->idx;
+        value = analysis->x[idx];
+    }
+
+    int status = fprintf(f,"%s:%5.2g\n",name,value);
+    if (status < 0) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void write_results(struct netlist_info *netlist, struct analysis_info *analysis) {
+    unsigned long i;
+    unsigned long j;
+    for (i=0; i<netlist->cmd_pool_size; ++i) {
+        struct command *cmd = &netlist->cmd_pool[i];
+        if (cmd->type == CMD_PRINT || cmd->type == CMD_PLOT)
+            for (j=0; j<cmd->print_plot.item_num; ++j)
+                write_result(cmd->print_plot.f,&cmd->print_plot.item[j],analysis);
+
+    }
+}
+
+static void analyse_dc(struct cmd_dc *dc, struct netlist_info *netlist,
+                       struct analysis_info *analysis) {
+    unsigned long _n = analysis->n;
+    unsigned long mna_dim_size = _n + analysis->el_group2_size;
+    dfloat_t *backup_mna_matrix = analysis->mna_matrix;
+    dfloat_t *backup_mna_vector = analysis->mna_vector;
+
+    dfloat_t *new_mna_matrix = (dfloat_t*)malloc(mna_dim_size * mna_dim_size * sizeof(dfloat_t));
+    if (!new_mna_matrix) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *new_mna_vector = (dfloat_t*)malloc(mna_dim_size * sizeof(dfloat_t));
+    if (!new_mna_vector) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    int use_cholesky = get_cmd_opt(netlist->cmd_pool,
+                                   netlist->cmd_pool_size,
+                                   CMD_OPT_SPD);
+
+    unsigned long i;
+    dfloat_t dc_value = dc->begin;
+    unsigned long repeat = (dc->end - dc->begin)/dc->step;
+    for (i=0; i<repeat; ++i,dc_value+=dc->step) {
+        memcpy(new_mna_matrix,backup_mna_matrix,mna_dim_size*mna_dim_size*sizeof(dfloat_t));
+        memcpy(new_mna_vector,backup_mna_vector,mna_dim_size*sizeof(dfloat_t));
+        analysis->mna_matrix = new_mna_matrix;
+        analysis->mna_vector = new_mna_vector;
+
+        //update mna_matrix and mna_vector
+        struct element *el = dc->source._el;
+        switch (el->type) {
+        case 'v':
+            if (el->v->vplus._node->nuid) {
+                unsigned long row = el->_vi->vplus._node->nuid - 1;
+                dfloat_t value = 1;
+
+                //group2 element, populate A2
+                analysis->mna_matrix[row*mna_dim_size + _n + el->idx] = value;
+
+                //group2 element, populate A2 transposed
+                analysis->mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
+            }
+
+            if (el->v->vminus._node->nuid) {
+                unsigned long row = el->_vi->vminus._node->nuid - 1;
+                dfloat_t value = -1;
+
+                //group2 element, populate A2
+                analysis->mna_matrix[row*mna_dim_size + _n + el->idx] = value;
+
+                //group2 element, populate A2 transposed
+                analysis->mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
+            }
+
+            analysis->mna_vector[_n + el->idx] = dc_value;
+            break;
+        case 'i':
+            //we have -A1*S1, therefore we subtract from the final result
+            if (el->i->vplus._node->nuid) {
+                unsigned long idx = el->i->vplus._node->nuid;
+                analysis->mna_vector[idx] -= el->value;
+            }
+            if (el->i->vminus._node->nuid) {
+                unsigned long idx = el->i->vminus._node->nuid;
+                analysis->mna_vector[idx] -= -el->value;
+            }
+
+            break;
+        default:  assert(0);
+        }
+
+        if (use_cholesky)
+            solve_cholesky(analysis);
+        else
+            solve_LU(analysis);
+
+        write_results(netlist,analysis);
+
+        //printf("\n***    repeat(%4lu) : Solution Vector (x)\n",i);
+        //print_dfloat_array(mna_dim_size,1,analysis->x);
+    }
+
+    //restore original mna_matrix and mna_vector
+    analysis->mna_matrix = backup_mna_matrix;
+    analysis->mna_vector = backup_mna_vector;
+    free(new_mna_matrix);
+    free(new_mna_vector);
+}
+
+static void open_logfiles(struct netlist_info *netlist) {
+    unsigned long i;
+    for (i=0; i<netlist->cmd_pool_size; ++i) {
+        struct command *cmd = &netlist->cmd_pool[i];
+        if (cmd->type == CMD_PRINT || cmd->type == CMD_PLOT) {
+            FILE *f = fopen(cmd->print_plot.logfile,"w");
+            if (!f) {
+                perror(__FUNCTION__);
+                exit(EXIT_FAILURE);
+            }
+            cmd->print_plot.f = f;
+        }
+    }
+}
+
+static void close_logfiles(struct netlist_info *netlist) {
+    unsigned long i;
+    for (i=0; i<netlist->cmd_pool_size; ++i) {
+        struct command *cmd = &netlist->cmd_pool[i];
+        if (cmd->type == CMD_PRINT || cmd->type == CMD_PLOT) {
+            FILE *f = cmd->print_plot.f;
+            int status;
+            status = fflush(f);
+            if (status == EOF) {
+                perror(__FUNCTION__);
+                exit(EXIT_FAILURE);
+            }
+            status = fclose(f);
+            if (status == EOF) {
+                perror(__FUNCTION__);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
 }
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
@@ -220,10 +387,26 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     int use_cholesky = get_cmd_opt(netlist->cmd_pool,
                                    netlist->cmd_pool_size,
                                    CMD_OPT_SPD);
+
+    open_logfiles(netlist);
+
+    unsigned long i;
+    for (i=0; i<netlist->cmd_pool_size; ++i) {
+        struct command *cmd = &netlist->cmd_pool[i];
+        if (cmd->type == CMD_DC) {
+            analyse_dc(&cmd->dc,netlist,analysis);
+            close_logfiles(netlist);
+            return;
+        }
+    }
+
     if (use_cholesky)
         solve_cholesky(analysis);
     else
         solve_LU(analysis);
+
+    write_results(netlist,analysis);
+    close_logfiles(netlist);
 }
 
 void print_int_array(unsigned long row, unsigned long col, int *p) {
