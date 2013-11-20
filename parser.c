@@ -32,7 +32,9 @@ struct file_info {
     size_t size;
 };
 
-struct file_info *current_input = NULL;
+static struct file_info *current_input = NULL;
+
+static unsigned long line_num = 1;
 
 #define INIT_EL_POOL_SIZE 1
 #define INIT_NODE_POOL_SIZE 1
@@ -64,6 +66,9 @@ struct hash_table *node_hash_table = NULL;
 static unsigned int cmd_pool_size = INIT_CMD_POOL_SIZE;
 static unsigned int cmd_pool_next = 0;
 static struct command *cmd_pool = NULL;
+
+static int counter_cmd_plot = 0;
+static int counter_cmd_print = 0;
 
 static inline void rebuild() {
     unsigned long i;
@@ -421,6 +426,8 @@ void print_nodes(unsigned long size, struct node node_pool[size]) {
 }
 
 void parser_init() {
+    line_num = 1;
+
     if (el_group1_pool) {
         unsigned long i;
         for (i=0; i<el_group1_pool_next; ++i) {
@@ -493,7 +500,8 @@ void parser_init() {
     ground->el_size = 0;
     ground->attached_el = NULL;
 
-    struct container_node *_cground = (struct container_node*)malloc(sizeof(struct container_node));
+    struct container_node *_cground =
+        (struct container_node*)malloc(sizeof(struct container_node));
     if (!_cground) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
@@ -516,6 +524,9 @@ void parser_init() {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+
+    counter_cmd_plot = 0;
+    counter_cmd_print = 0;
 }
 
 int is_semantically_correct() {
@@ -622,17 +633,16 @@ void parse_eat_whitechars(char **buf) {
 }
 
 void parse_eat_newline(char **buf) {
-    /* skip all LF */
+    /* skip all CR and LF */
 
     char *end = current_input->raw_end;
     while (*buf != end) {
-        if (**buf == '\r') {
-            (*buf)++;
-            continue;
-        }
-        if (**buf != '\n') {
+        if (**buf == '\r')
+            ;
+        else if (**buf != '\n')
             break;
-        }
+        else
+            line_num++;
         (*buf)++;
     }
     if (*buf == end)
@@ -709,7 +719,7 @@ char *parse_string(char **buf, char *info) {
     //printf("in function: %s\n",__FUNCTION__);
 
     if (!*buf || isdelimiter(**buf)) {
-        printf("error: expected %s - exit.\n",info);
+        printf("error:%lu: expected %s - exit.\n",line_num,info);
         exit(EXIT_FAILURE);
     }
 
@@ -754,7 +764,7 @@ char parse_char(char **buf, char *patterns, char *info) {
     if (*buf == end)
         *buf = NULL;
     if (!*buf) {
-        printf("error: expected %s - exit.\n",info);
+        printf("error:%lu: expected %s - exit.\n",line_num,info);
         exit(EXIT_FAILURE);
     }
 
@@ -766,8 +776,8 @@ char parse_char(char **buf, char *patterns, char *info) {
         p++;
 
     if (*p == '\0') {
-        printf("error: parsing %s, expected '%s' got '%c' 0x%02x (hex ascii) - exit\n",
-               info,patterns,c,c);
+        printf("error:%lu: parsing %s, expected '%s' got '%c' 0x%02x (hex ascii) - exit\n",
+               line_num,info,patterns,c,c);
         exit(EXIT_FAILURE);
     }
 
@@ -780,7 +790,7 @@ dfloat_t parse_value(char **buf, char *prefix, char *info) {
     //printf("in function: %s\n",__FUNCTION__);
 
     if (!*buf || isspace(**buf)) {
-        printf("error: expected %s - exit\n",info);
+        printf("error:%lu: expected %s - exit\n",line_num,info);
         exit(EXIT_FAILURE);
     }
 
@@ -791,7 +801,8 @@ dfloat_t parse_value(char **buf, char *prefix, char *info) {
             char c = tolower(**buf);
             char p = tolower(prefix[i]);
             if (c != p) {
-                printf("error: expected prefix '%s' before value - exit\n",prefix);
+                printf("error:%lu: expected prefix '%s' before value - exit\n",
+                       line_num,prefix);
                 exit(EXIT_FAILURE);
             }
             (*buf)++;
@@ -825,7 +836,8 @@ dfloat_t parse_value(char **buf, char *prefix, char *info) {
     if (*buf == end)
         *buf = NULL;
     if (*buf && !isspace(**buf)) {
-        printf("error: invalid character '%c' after value %lf - exit.\n",**buf,value);
+        printf("error:%lu: invalid character '%c' after value %lf - exit.\n",
+               line_num,**buf,value);
         exit(EXIT_FAILURE);
     }
 
@@ -954,6 +966,81 @@ static void discard_line(char **buf) {
     }
 }
 
+static char *create_log_filename(char *prefix, int num) {
+    char *log_filename = (char*)malloc(MAX_LOG_FILENAME * sizeof(char));
+    if (!log_filename) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+    int size = snprintf(log_filename,MAX_LOG_FILENAME,"%s_%05d.log",prefix,num);
+    assert(size < MAX_LOG_FILENAME);
+    if (size < 0) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+    return log_filename;
+}
+
+void parse_print_plot_item(char **buf, struct command *cmd) {
+    assert(cmd);
+
+    int idx = cmd->print_plot.item_num;
+    if (idx == MAX_PRINT_PLOT_ITEMS) {
+        printf("Reached limit for print/plot items (%d) - exit\n",
+               MAX_PRINT_PLOT_ITEMS);
+        exit(EXIT_FAILURE);
+    }
+
+    char el_type = parse_char(buf,"vi","print/plot type");
+    assert(el_type == 'v' || el_type == 'i');
+
+    parse_eat_whitechars(buf);
+    parse_char(buf,"(","lparen");
+    parse_eat_whitechars(buf);
+
+    char *node_name = parse_string(buf,"node name");
+    if (el_type == 'v') {
+        struct container_node *_cnode = hash_get(node_hash_table,node_name);
+        if (!_cnode) {
+            printf("error: node '%s' not found - exit\n",node_name);
+            free(node_name);
+            exit(EXIT_FAILURE);
+        }
+
+        cmd->print_plot.item[idx].type = el_type;
+        cmd->print_plot.item[idx].cnode =*_cnode;
+    }
+    else {
+        //TODO: we need hash tables for elements for faster searches
+        unsigned int i;
+        struct element *_el = NULL;
+        for (i=0; i<el_group1_pool_next; ++i) {
+            struct element *el = &el_group1_pool[i];
+            if (el->type == 'i' && strcmp(el->name,node_name) == 0) {
+                _el = el;
+                break;
+            }
+        }
+        if (!_el) {
+            printf("error: element '%s' not found - exit\n",node_name);
+            free(node_name);
+            exit(EXIT_FAILURE);
+        }
+
+        cmd->print_plot.item[idx].type = el_type;
+        struct container_element _cel = { .type=_el->type,
+                                          .idx=_el->idx,
+                                          ._el=_el };
+        cmd->print_plot.item[idx].cel =_cel;
+    }
+
+    cmd->print_plot.item_num++;
+
+    parse_eat_whitechars(buf);
+    parse_char(buf,")","rparen");
+    parse_eat_whitechars(buf);
+}
+
 void parse_command(char **buf) {
     //printf("in function: %s\n",__FUNCTION__);
 
@@ -1052,7 +1139,10 @@ void parse_command(char **buf) {
             return;
         }
 
-        new_cmd.dc.type = dc_type;
+        struct container_element _cel = { .type=dc_source->type,
+                                          .idx=dc_source->idx,
+                                          ._el=dc_source };
+        new_cmd.dc.source = _cel;
         new_cmd.dc.begin = begin;
         new_cmd.dc.end = end;
         new_cmd.dc.step = step;
@@ -1061,35 +1151,24 @@ void parse_command(char **buf) {
     }
     case CMD_PLOT:
     case CMD_PRINT: {
-        char el_type = parse_char(buf,"vi","plot type");
-        assert(el_type == 'v' || el_type == 'i');
+        new_cmd.print_plot.item_num = 0;
 
-        parse_eat_whitechars(buf);
-        parse_char(buf,"(","lparen");
-        parse_eat_whitechars(buf);
-
-        char *node_name = parse_string(buf,"node name");
-        if (el_type == 'v') {
-            struct container_node *_cnode = hash_get(node_hash_table,node_name);
-            if (!_cnode) {
-                printf("error: node '%s' not found - exit\n",node_name);
-                free(node_name);
-                exit(EXIT_FAILURE);
-            }
-            //TODO: populate new_cmd
-        }
-        else {
-            //TODO: search elements
-            //      we need hash tables for elements for faster searches
-            assert(0 && "plot/print of current values is not supported yet!");
+        char *end = current_input->raw_end;
+        while (*buf != end) {
+            parse_print_plot_item(buf,&new_cmd);
+            if (**buf == '\n')
+                break;
         }
 
-        parse_eat_whitechars(buf);
-        parse_char(buf,")","rparen");
-        parse_eat_whitechars(buf);
+        if (*buf == end)
+            *buf = NULL;
 
-        //TODO: allow multiple nodes/elements in print/plot
-
+        if (type == CMD_PLOT)
+            new_cmd.print_plot.logfile =
+                create_log_filename("plot",counter_cmd_plot++);
+        else
+            new_cmd.print_plot.logfile =
+                create_log_filename("print",counter_cmd_print++);
         break;
     }
     default:  assert(0);

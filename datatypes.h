@@ -37,29 +37,44 @@ enum cmd_option_type {
 #define CMD_SIZE (CMD_PRINT + 1)
 #define CMD_OPT_SIZE (CMD_OPT_SPD + 1)
 
-struct container_node;
-struct container_element;
+struct node;
+struct element;
 
-struct cmd_plot {
-    char type;
-    union {
-        struct container_node *c_node;
-        struct container_element *c_el;
-    };
-    char *logfile;
+/* Containers act like smart pointers.
+   We need them to keep track of the memory address of data in case it changes
+   due to realloc().
+*/
+
+struct container_node {
+    unsigned long nuid;
+    struct node *_node;
 };
 
-struct cmd_print {
+struct container_element {
+    char type;
+    unsigned long idx;
+    struct element *_el;
+};
+
+struct cmd_print_plot_item {
     char type;
     union {
-        struct container_node *c_node;
-        struct container_element *c_el;
+        struct container_node cnode;
+        struct container_element cel;
     };
+};
+
+#define MAX_PRINT_PLOT_ITEMS 16
+#define MAX_LOG_FILENAME 16
+
+struct cmd_print_plot {
+    unsigned int item_num;
+    struct cmd_print_plot_item item[MAX_PRINT_PLOT_ITEMS];
     char *logfile;
 };
 
 struct cmd_dc {
-    char type;  //this may be 'v' for voltage or 'i' for current
+    struct container_element source;
     dfloat_t begin;
     dfloat_t end;
     dfloat_t step;
@@ -70,8 +85,7 @@ struct command {
     union {
         enum cmd_option_type option_type;
         struct cmd_dc dc;
-        struct cmd_plot plot;
-        struct cmd_print print;
+        struct cmd_print_plot print_plot;
     };
 };
 
@@ -82,11 +96,6 @@ struct node {
     unsigned long refs;
     unsigned long el_size;
     struct container_element *attached_el;
-};
-
-struct container_node {
-    unsigned long nuid;
-    struct node *_node;
 };
 
 struct _passive_ {
@@ -166,12 +175,6 @@ struct element {
 
         void *raw_ptr;
     };
-};
-
-struct container_element {
-    char type;
-    unsigned long idx;
-    struct element *_el;
 };
 
 struct netlist_info {
