@@ -15,3 +15,6 @@ caper: $(OBJ)
 
 clean:
 	rm -f *.o *~ core caper
+
+archive:
+	git archive --format=zip master -o caper.zip
