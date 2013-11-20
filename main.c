@@ -25,18 +25,6 @@ void debug_info() {
     printf("sizeof(double) = %lu\n",sizeof(double));
     printf("sizeof(dfloat_t) = %lu\n",sizeof(dfloat_t));
 
-#if 0
-    printf("sizeof(struct node*) = %lu\n",sizeof(struct node*));
-    printf("sizeof(struct element*) = %lu\n",sizeof(struct element*));
-    printf("sizeof(struct _source_*) = %lu\n",sizeof(struct _source_*));
-    printf("sizeof(struct _passive_*) = %lu\n",sizeof(struct _passive_*));
-    printf("sizeof(struct _mos_*) = %lu\n",sizeof(struct _mos_*));
-    printf("sizeof(struct _bjt_*) = %lu\n",sizeof(struct _bjt_*));
-    printf("sizeof(struct _diode_*) = %lu\n",sizeof(struct _diode_*));
-
-    printf("sizeof(unsigned long*) = %lu\n",sizeof(unsigned long*));
-#endif
-
     printf("sizeof(void*) = %lu\n",sizeof(void*));
 }
 
@@ -96,7 +84,8 @@ void handle_file(char *filename) {
 int main(int argc, char *argv[]) {
     int i;
 
-    debug_info();
+    if (argc == 1)
+        debug_info();
 
     for (i=1; i<argc; ++i) {
         handle_file(argv[i]);
