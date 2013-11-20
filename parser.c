@@ -1121,15 +1121,15 @@ void parse_command(char **buf) {
 
         if (step == 0) {
             error = 1;
-            printf("error: dc step cannot be zero\n");
+            printf("error:%lu: dc step cannot be zero\n",line_num);
         }
         if (begin < end && step < 0) {
             error = 1;
-            printf("error: expected positive dc step\n");
+            printf("error:%lu: expected positive dc step\n",line_num);
         }
         if (begin > end && step > 0) {
             error = 1;
-            printf("error: expected negative dc step\n");
+            printf("error:%lu: expected negative dc step\n",line_num);
         }
 
         if (error) {
