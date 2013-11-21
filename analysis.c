@@ -116,7 +116,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                 }
             }
             else if (el->type == 'v') {
-                //ignore 'l' elements
                 assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
 
                 //ignore ground node
@@ -131,6 +130,24 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                     mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
                 }
             }
+#if 1
+            else if (el->type == 'l') {
+                assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
+
+                //ignore ground node
+                if (_node->nuid) {
+                    unsigned long row = _node->nuid - 1;
+                    dfloat_t value = (_node == el->l->vplus._node) ? +1 : -1;
+                    //dfloat_t value = (_node == el->l->vplus._node) ? el->value : -el->value;
+
+                    //group2 element, populate A2
+                    mna_matrix[row*mna_dim_size + _n + el->idx] = value;
+
+                    //group2 element, populate A2 transposed
+                    mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
+                }
+            }
+#endif
             switch (el->type) {
             case 'v':  mna_vector[_n + el->idx] = el->value;  break;
             case 'i': {
@@ -383,6 +400,9 @@ static void close_logfiles(struct netlist_info *netlist) {
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     analysis_init(netlist,analysis);
+    unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
+    printf("\n***    MNA Matrix (before)\n");
+    print_dfloat_array(mna_dim_size,mna_dim_size,analysis->mna_matrix);
 
     int use_cholesky = get_cmd_opt(netlist->cmd_pool,
                                    netlist->cmd_pool_size,
