@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <string.h>
 #include <gsl/gsl_linalg.h>
+#include <math.h>
 
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
     assert(netlist);
@@ -220,6 +221,118 @@ void solve_cholesky(struct analysis_info *analysis) {
 
     gsl_linalg_cholesky_decomp(&Aview.matrix);
     gsl_linalg_cholesky_solve(&Aview.matrix,&bview.vector,&x.vector);
+}
+
+static inline dfloat_t *init_preconditioner(dfloat_t *M, dfloat_t *z, dfloat_t *r, unsigned long mna_dim_size) {
+    unsigned long i;
+    for (i=0; i<mna_dim_size; ++i)
+        z[i] = r[i]/M[i];
+    return z;
+}
+
+static inline dfloat_t _dot(dfloat_t *x, dfloat_t *y, unsigned long size) {
+    unsigned long i;
+    dfloat_t result = 0;
+    for (i=0; i<size; ++i)
+        result += x[i]*y[i];
+    return result;
+}
+
+static inline dfloat_t *_dot_add(dfloat_t *result, dfloat_t *z, dfloat_t beta, dfloat_t *p, unsigned long size) {
+    unsigned long i;
+    for (i=0; i<size; ++i)
+        result[i] = z[i] + beta*p[i];
+    return result;
+}
+
+static inline dfloat_t *_mult(dfloat_t *q, dfloat_t *A, dfloat_t *x, unsigned long size) {
+    unsigned long i;
+    for (i=0; i<size; ++i) {
+        dfloat_t *row = &A[i*size];
+        q[i] = _dot(row,x,size);
+    }
+    return q;
+}
+
+void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
+    unsigned long _n = analysis->n;
+    unsigned long el_group2_size = analysis->el_group2_size;
+    unsigned long mna_dim_size = _n + el_group2_size;
+
+    //initial values:
+    //                 _x[] = 0,...,0
+    //                 _r = b
+
+    //dfloat_t *_x = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    dfloat_t *_x = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
+    if (!_x) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    //dfloat_t *_r = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    dfloat_t *_r = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
+    if (!_r) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+    dfloat_t *_b = analysis->mna_vector;
+    memcpy(_r,_b,mna_dim_size);
+
+    dfloat_t *_z = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_z) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_M = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_M) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    unsigned long k;
+    for (k=0; k<mna_dim_size; ++k)
+        _M[k] = analysis->mna_matrix[k*mna_dim_size + k];
+
+    dfloat_t *_p = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_p) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_q = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_q) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t rho_old = _dot(_r,_r,mna_dim_size);
+
+    dfloat_t norm_b = sqrt(_dot(_b,_b,mna_dim_size));
+    if (norm_b == 0)
+        norm_b = 1;
+
+    int i = 0;
+    const int max_iter = mna_dim_size;
+    for (i=0; i<max_iter; ++i) {
+        _z = init_preconditioner(_M,_z,_r,mna_dim_size);
+        dfloat_t rho = _dot(_r,_z,mna_dim_size);
+        if (i == 0)
+            memcpy(_p,_z,mna_dim_size);
+        else {
+            dfloat_t beta = rho/rho_old;
+            _p = _dot_add(_p,_z,beta,_p,mna_dim_size);
+        }
+        rho_old = rho;
+        _q = _mult(_q,analysis->mna_matrix,_p,mna_dim_size);
+        dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
+        _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
+        _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
+        dfloat_t cond = sqrt(_dot(_r,_r,mna_dim_size))/norm_b;
+        if (cond < tol)
+            break;
+    }
 }
 
 static int get_cmd_opt(struct command *pool, unsigned long size,
