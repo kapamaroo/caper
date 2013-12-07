@@ -1,12 +1,11 @@
-*add parser features
+*check solve cg method (if Aii = 0 then Mi=1)
 
-*    Stepping
-*.dc <input_variable> <start_value> <end_value> <step>
-*Example
-*.dc v1 0 3 .01
+*implement solve bi-cg method
 
-*    Plot
-*.plot v(<node_name>)
-*.print v(<node_name>)
-*
-* each node to separate file
+*add options :
+  .options ITER //->do bi-cg
+  .options SPD ITER //->do cg
+  .options SPD //->do choleksy (already implemented)
+  (nothing -> do LU)
+  .options ITOL=<value> (tolerance for iterative methods,
+                          if none default ITOL=1e-3)
