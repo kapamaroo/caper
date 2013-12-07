@@ -28,16 +28,21 @@ enum cmd_type {
     CMD_DC,
     CMD_PLOT,
     CMD_PRINT,
-    CMD_BAD_COMMAND
+    CMD_BAD_COMMAND  //must be last
 };
 
 enum cmd_option_type {
     CMD_OPT_SPD = 0,
-    CMD_OPT_BAD_OPTION
+    CMD_OPT_ITER,
+    CMD_OPT_SPD_ITER,
+    CMD_OPT_ITOL,
+    CMD_OPT_BAD_OPTION  //must be last
 };
 
-#define CMD_SIZE (CMD_PRINT + 1)
-#define CMD_OPT_SIZE (CMD_OPT_SPD + 1)
+#define CMD_SIZE (CMD_BAD_COMMAND)
+#define CMD_OPT_SIZE (CMD_OPT_BAD_OPTION)
+
+#define DEFAULT_TOL 1e-3
 
 struct node;
 struct element;
@@ -85,6 +90,7 @@ struct cmd_dc {
 
 struct command {
     enum cmd_type type;
+    dfloat_t value;
     union {
         enum cmd_option_type option_type;
         struct cmd_dc dc;

@@ -626,6 +626,19 @@ void parse_eat_newline(char **buf) {
         *buf = NULL;
 }
 
+static int discard_line(char **buf) {
+    int bad_chars = 0;
+    char *end = current_input->raw_end;
+    while (*buf != end) {
+        if (**buf == '\n')
+            break;
+        else if (**buf != '\r')
+            bad_chars++;
+        (*buf)++;
+    }
+    return bad_chars;
+}
+
 void parse_line(char **buf) {
     parse_eat_whitechars(buf);
     if (!*buf)
@@ -637,6 +650,11 @@ void parse_line(char **buf) {
     case '*':  parse_comment(buf);  break;
     case '.':  parse_command(buf);  break;
     default:   parse_element(buf);  break;
+    }
+    int garbage = discard_line(buf);
+    if (garbage) {
+        printf("warning: %d garbage characters at end of line %lu\n", garbage, line_num);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -795,12 +813,16 @@ dfloat_t parse_value(char **buf, char *prefix, char *info) {
 #else
     int status = sscanf(*buf,"%f",&value);
 #endif
+    if (errno) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
     if (status == EOF) {
         printf("error: sscanf() early fail\n");
         exit(EXIT_FAILURE);
     }
-    if (errno) {
-        perror(__FUNCTION__);
+    if (status == 0) {
+        printf("error: sscanf() bad input\n");
         exit(EXIT_FAILURE);
     }
 
@@ -905,8 +927,9 @@ void parse_comment(char **buf) {
 
     char *end = current_input->raw_end;
     while (*buf != end) {
-        if (*(*buf)++ == '\n')
+        if (**buf == '\n')
             break;
+        (*buf)++;
     }
     if (*buf == end)
         *buf = NULL;
@@ -916,7 +939,7 @@ void parse_comment(char **buf) {
 static const char *cmd_base[] = { "option", "dc", "plot", "print" };
 
 //these must be in the same order as in the enum cmd_opt_type in datatypes.h
-static const char *cmd_opt_base[] = { "spd" };
+static const char *cmd_opt_base[] = { "spd", "iter", "spd iter", "itol" };
 
 static inline enum cmd_type get_cmd_type(char *cmd) {
     int i;
@@ -932,15 +955,6 @@ static inline enum cmd_option_type get_cmd_opt_type(char *opt) {
         if (strcmp(opt, cmd_opt_base[i]) == 0)
             return (enum cmd_option_type)i;
     return CMD_OPT_BAD_OPTION;
-}
-
-static void discard_line(char **buf) {
-    char *end = current_input->raw_end;
-    while (*buf != end) {
-        if (**buf == '\n')
-            break;
-        (*buf)++;
-    }
 }
 
 static char *create_log_filename(char *prefix, int num) {
@@ -1030,8 +1044,6 @@ void parse_command(char **buf) {
     if (type == CMD_BAD_COMMAND) {
         printf("***  WARNING  ***    Unknown command '%s' - error\n",cmd);
         free(cmd);
-        discard_line(buf);
-        parse_eat_whitechars(buf);
         return;
     }
 
@@ -1046,12 +1058,33 @@ void parse_command(char **buf) {
         case CMD_OPT_BAD_OPTION:
             printf("***  WARNING  ***    Unknown .option argument '%s' - error\n",opt);
             free(opt);
-            discard_line(buf);
-            parse_eat_whitechars(buf);
             return;
-        case CMD_OPT_SPD:
+        case CMD_OPT_SPD: {
             new_cmd.option_type = opt_type;
+            parse_eat_whitechars(buf);
+            if (*buf && !isdelimiter(**buf)) {
+                char *iter = parse_string(buf,"expected \"iter\"");
+                assert(strcmp(iter,"iter")==0);
+                new_cmd.option_type = CMD_OPT_SPD_ITER;
+                new_cmd.value = DEFAULT_TOL;
+            }
             break;
+        }
+        case CMD_OPT_SPD_ITER:
+            assert(0 && "should be handled above");
+            break;
+        case CMD_OPT_ITER:
+            new_cmd.option_type = opt_type;
+            new_cmd.value = DEFAULT_TOL;
+            break;
+        case CMD_OPT_ITOL: {
+            new_cmd.option_type = opt_type;
+            parse_eat_whitechars(buf);
+            dfloat_t value = parse_value(buf,NULL,"tolerance value");
+            new_cmd.value = value;
+            printf("debug: tolerance value = %g\n",value);
+            break;
+        }
         }
         break;
     }
@@ -1083,8 +1116,6 @@ void parse_command(char **buf) {
         if (!dc_source) {
             printf("***  WARNING  ***    Unknown dc source '%s' - error\n",name);
             free(name);
-            discard_line(buf);
-            parse_eat_whitechars(buf);
             return;
         }
 
@@ -1111,8 +1142,6 @@ void parse_command(char **buf) {
 
         if (error) {
             free(name);
-            discard_line(buf);
-            parse_eat_whitechars(buf);
             return;
         }
 
