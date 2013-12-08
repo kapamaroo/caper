@@ -230,6 +230,7 @@ void solve_cholesky(struct analysis_info *analysis) {
 static inline dfloat_t *init_preconditioner(dfloat_t *M, dfloat_t *z, dfloat_t *r, unsigned long mna_dim_size) {
     unsigned long i;
     for (i=0; i<mna_dim_size; ++i)
+        //z[i] = (M[i] != 0) ? r[i]/M[i] : r[i];
         z[i] = (M[i] != 0) ? r[i]/M[i] : 0;
     return z;
 }
