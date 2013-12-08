@@ -37,7 +37,7 @@ void handle_file(char *filename) {
         return;
     }
 
-#if 1
+#if 0
     printf("\n\n***    Circuit Elements    ***\n\n");
     print_elements(netlist.el_group1_size,netlist.el_group1_pool);
     print_elements(netlist.el_group2_size,netlist.el_group2_pool);
@@ -65,7 +65,6 @@ void handle_file(char *filename) {
     print_dfloat_array(analysis.el_group1_size,1,analysis.S1);
     printf("\n***    S2\n");
     print_dfloat_array(analysis.el_group2_size,1,analysis.S2);
-#endif
 
     unsigned long mna_dim_size = analysis.n + analysis.el_group2_size;
     printf("\n***    MNA Matrix\n");
@@ -73,6 +72,7 @@ void handle_file(char *filename) {
     printf("\n***    MNA Vector\n");
     print_dfloat_array(mna_dim_size,1,analysis.mna_vector);
 
+#endif
     printf("\n***    Solution Vector (x)\n");
     print_dfloat_array(analysis.n + analysis.el_group2_size,
                        1,analysis.x);
