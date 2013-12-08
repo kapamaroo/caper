@@ -629,6 +629,8 @@ void parse_eat_newline(char **buf) {
 static int discard_line(char **buf) {
     int bad_chars = 0;
     char *end = current_input->raw_end;
+    if (!(*buf))
+        return 0;
     while (*buf != end) {
         if (**buf == '\n')
             break;
@@ -636,6 +638,8 @@ static int discard_line(char **buf) {
             bad_chars++;
         (*buf)++;
     }
+    if (*buf == end)
+        *buf = NULL;
     return bad_chars;
 }
 
