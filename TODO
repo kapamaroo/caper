@@ -1,11 +1,11 @@
-*check solve cg method (if Aii = 0 then Mi=1)
+DONE *check solve cg method (if Aii = 0 then Mi=1)
 
-*implement solve bi-cg method
+DONE *implement solve bi-cg method
 
 *add options :
-  .options ITER //->do bi-cg
-  .options SPD ITER //->do cg
-  .options SPD //->do choleksy (already implemented)
-  (nothing -> do LU)
-  .options ITOL=<value> (tolerance for iterative methods,
+DONE  .options ITER //->do bi-cg
+DONE  .options SPD ITER //->do cg
+DONE  .options SPD //->do choleksy (already implemented)
+DONE  (nothing -> do LU)
+DONE  .options ITOL=<value> (tolerance for iterative methods,
                           if none default ITOL=1e-3)
