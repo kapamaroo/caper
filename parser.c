@@ -1063,8 +1063,14 @@ void parse_command(char **buf) {
             new_cmd.option_type = opt_type;
             parse_eat_whitechars(buf);
             if (*buf && !isdelimiter(**buf)) {
+                char *backup_pos = *buf;
                 char *iter = parse_string(buf,"expected \"iter\"");
-                assert(strcmp(iter,"iter")==0);
+                if (strcmp(iter,"iter")!=0) {
+                    (*buf) = backup_pos;
+                    free(iter);
+                    return;
+                }
+                free(iter);
                 new_cmd.option_type = CMD_OPT_SPD_ITER;
                 new_cmd.value = DEFAULT_TOL;
             }
@@ -1082,7 +1088,6 @@ void parse_command(char **buf) {
             parse_eat_whitechars(buf);
             dfloat_t value = parse_value(buf,NULL,"tolerance value");
             new_cmd.value = value;
-            printf("debug: tolerance value = %g\n",value);
             break;
         }
         }
