@@ -440,7 +440,7 @@ void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
     //M^T == M (diagonal)
 
     int i = 0;
-    const int max_iter = mna_dim_size;
+    const int max_iter = (mna_dim_size > 20) ? mna_dim_size : 20;  //max()
     for (i=0; i<max_iter; ++i) {
         _z = init_preconditioner(_M,_z,_r,mna_dim_size);
         _z_ = init_preconditioner(_M,_z_,_r_,mna_dim_size);
