@@ -568,19 +568,31 @@ static dfloat_t get_tolerance(struct command *pool, unsigned long size) {
     return DEFAULT_TOL;
 }
 
-static void analyse_dc(struct cmd_dc *dc, struct netlist_info *netlist,
-                       struct analysis_info *analysis) {
-    enum solver _solver = get_solver(netlist->cmd_pool,netlist->cmd_pool_size);
-    dfloat_t tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);
-    printf("debug: tolerance value = %g\n",tol);
-
-    //preparation
+static void analyse_init_solver(struct analysis_info *analysis,
+                                enum solver _solver) {
     switch (_solver) {
     case S_SPD:  decomp_cholesky(analysis);  break;
     case S_LU:   decomp_LU(analysis);        break;
     default:                                 break;
     }
+}
 
+static void analyse_one_step(struct netlist_info *netlist,
+                             struct analysis_info *analysis,
+                             enum solver _solver, dfloat_t tol) {
+    switch (_solver) {
+    case S_SPD:       solve_cholesky(analysis);   break;
+    case S_ITER:      solve_bi_cg(analysis,tol);  break;
+    case S_SPD_ITER:  solve_cg(analysis,tol);     break;
+    case S_LU:        solve_LU(analysis);         break;
+    }
+    write_results(netlist,analysis);
+}
+
+static void analyse_dc_init(struct cmd_dc *dc,
+                            struct netlist_info *netlist,
+                            struct analysis_info *analysis,
+                            enum solver _solver, dfloat_t tol) {
     unsigned long _n = analysis->n;
 
     //init mna_vector
@@ -604,44 +616,46 @@ static void analyse_dc(struct cmd_dc *dc, struct netlist_info *netlist,
     }
     default:  assert(0);
     }
+}
 
+static void analyse_dc_update(struct cmd_dc *dc,
+                              struct netlist_info *netlist,
+                              struct analysis_info *analysis,
+                              enum solver _solver, dfloat_t tol) {
+    unsigned long _n = analysis->n;
+    struct element *el = dc->source._el;
+    switch (el->type) {
+    case 'v': {
+        //update mna_vector
+        analysis->mna_vector[_n + el->idx] += dc->step;
+        break;
+    }
+    case 'i': {
+        //we have -A1*S1, therefore we subtract from the final result
+        if (el->i->vplus._node->nuid) {
+            unsigned long idx = el->i->vplus._node->nuid - 1;
+            analysis->mna_vector[idx] -= dc->step;
+        }
+        if (el->i->vminus._node->nuid) {
+            unsigned long idx = el->i->vminus._node->nuid - 1;
+            analysis->mna_vector[idx] += dc->step;
+        }
+        break;
+    }
+    default:  assert(0);
+    }
+}
+
+static void analyse_dc(struct cmd_dc *dc,
+                       struct netlist_info *netlist,
+                       struct analysis_info *analysis,
+                       enum solver _solver, dfloat_t tol) {
+    analyse_dc_init(dc,netlist,analysis,_solver,tol);
     unsigned long i;
     unsigned long repeat = (dc->end - dc->begin)/dc->step;
     for (i=0; i<repeat; ++i) {
-        struct element *el = dc->source._el;
-        switch (el->type) {
-        case 'v': {
-            //update mna_vector
-            analysis->mna_vector[_n + el->idx] += dc->step;
-            break;
-        }
-        case 'i': {
-            //we have -A1*S1, therefore we subtract from the final result
-            if (el->i->vplus._node->nuid) {
-                unsigned long idx = el->i->vplus._node->nuid - 1;
-                analysis->mna_vector[idx] -= dc->step;
-            }
-            if (el->i->vminus._node->nuid) {
-                unsigned long idx = el->i->vminus._node->nuid - 1;
-                analysis->mna_vector[idx] += dc->step;
-            }
-            break;
-        }
-        default:  assert(0);
-        }
-
-        switch (_solver) {
-        case S_SPD:       solve_cholesky(analysis);   break;
-        case S_ITER:      solve_bi_cg(analysis,tol);  break;
-        case S_SPD_ITER:  solve_cg(analysis,tol);     break;
-        case S_LU:        solve_LU(analysis);         break;
-        }
-
-        write_results(netlist,analysis);
-
-        //printf("\n***    repeat(%4lu) : Solution Vector (x)\n",i);
-        //unsigned long mna_dim_size = _n + analysis->el_group2_size;
-        //print_dfloat_array(mna_dim_size,1,analysis->x);
+        analyse_dc_update(dc,netlist,analysis,_solver,tol);
+        analyse_one_step(netlist,analysis,_solver,tol);
     }
 }
 
@@ -683,32 +697,26 @@ static void close_logfiles(struct netlist_info *netlist) {
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     analysis_init(netlist,analysis);
-    open_logfiles(netlist);
-
-    unsigned long i;
-    for (i=0; i<netlist->cmd_pool_size; ++i) {
-        struct command *cmd = &netlist->cmd_pool[i];
-        if (cmd->type == CMD_DC) {
-            analyse_dc(&cmd->dc,netlist,analysis);
-            close_logfiles(netlist);
-            return;
-        }
-    }
 
     enum solver _solver = get_solver(netlist->cmd_pool,netlist->cmd_pool_size);
     dfloat_t tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);
     printf("debug: tolerance value = %g\n",tol);
 
-    switch (_solver) {
-    case S_SPD:       decomp_cholesky(analysis);
-                      solve_cholesky(analysis);   break;
-    case S_ITER:      solve_bi_cg(analysis,tol);  break;
-    case S_SPD_ITER:  solve_cg(analysis,tol);     break;
-    case S_LU:        decomp_LU(analysis);
-                      solve_LU(analysis);         break;
+    struct command *dc_cmd = NULL;
+    unsigned long i;
+    for (i=0; i<netlist->cmd_pool_size; ++i) {
+        if (netlist->cmd_pool[i].type == CMD_DC) {
+            dc_cmd = &netlist->cmd_pool[i];
+            break;
+        }
     }
 
-    write_results(netlist,analysis);
+    analyse_init_solver(analysis,_solver);
+    open_logfiles(netlist);
+    if (dc_cmd)
+        analyse_dc(&dc_cmd->dc,netlist,analysis,_solver,tol);
+    else
+        analyse_one_step(netlist,analysis,_solver,tol);
     close_logfiles(netlist);
 }
 
