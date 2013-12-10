@@ -19,9 +19,6 @@ struct analysis_info {
     unsigned long el_group1_size;
     unsigned long el_group2_size;
 
-    dfloat_t *C;  //capacity matrix (m1 x m1) diagonal
-    dfloat_t *L;  //self inductor matrix  (m2 x m2) diagonal
-
     dfloat_t *v;  //node's voltage relative to ground
                   //('node_size' elements)
 

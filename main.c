@@ -48,37 +48,20 @@ void handle_file(char *filename) {
     struct analysis_info analysis;
     analyse_mna(&netlist,&analysis);
 
-#if 0
-    printf("\n***    A\n");
-    print_char_int_array(analysis.n, analysis.e, analysis.A);
-    printf("\n***    A1\n");
-    print_char_int_array(analysis.n,analysis.el_group1_size,analysis.A1);
-    printf("\n***    A2\n");
-    print_char_int_array(analysis.n,analysis.el_group2_size,analysis.A2);
-    printf("\n***    G\n");
-    print_dfloat_array(analysis.el_group1_size,1,analysis.G);
-    printf("\n***    C\n");
-    print_dfloat_array(analysis.el_group1_size,1,analysis.C);
-    printf("\n***    L\n");
-    print_dfloat_array(analysis.el_group2_size,1,analysis.L);
-    printf("\n***    S1\n");
-    print_dfloat_array(analysis.el_group1_size,1,analysis.S1);
-    printf("\n***    S2\n");
-    print_dfloat_array(analysis.el_group2_size,1,analysis.S2);
+    printf("\nelements = %lu\n",analysis.e);
+    printf("nodes = %lu  //without ground\n",analysis.n);
 
+#if 0
     unsigned long mna_dim_size = analysis.n + analysis.el_group2_size;
     printf("\n***    MNA Matrix\n");
     print_dfloat_array(mna_dim_size,mna_dim_size,analysis.mna_matrix);
     printf("\n***    MNA Vector\n");
     print_dfloat_array(mna_dim_size,1,analysis.mna_vector);
-
 #endif
+
     printf("\n***    Solution Vector (x)\n");
     print_dfloat_array(analysis.n + analysis.el_group2_size,
                        1,analysis.x);
-
-    printf("\nelements = %lu\n",analysis.e);
-    printf("nodes = %lu  //without ground\n",analysis.n);
 }
 
 int main(int argc, char *argv[]) {

@@ -57,37 +57,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
-    dfloat_t *C = (dfloat_t*)calloc(el_group1_size, sizeof(dfloat_t));
-    if (!C) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    dfloat_t *L = (dfloat_t*)calloc(el_group2_size, sizeof(dfloat_t));
-    if (!L) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
     printf("analysis: populating matrices ...\n");
 
     unsigned long i;
-    for (i=0; i<el_group1_size; ++i) {
-        struct element *_el = &netlist->el_group1_pool[i];
-        switch (_el->type) {
-        case 'c':   C[i] =     _el->value;  break;
-        default:                            break;
-        }
-    }
-
-    for (i=0; i<el_group2_size; ++i) {
-        struct element *_el = &netlist->el_group2_pool[i];
-        switch (_el->type) {
-        case 'l':  L[i] = _el->value;  break;
-        default:                       break;
-        }
-    }
-
     unsigned long j;
 
     //populate MNA Matrix
@@ -162,8 +134,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
     analysis->el_group2_size = el_group2_size;
-    analysis->C = C;
-    analysis->L = L;
     analysis->v = v;
     analysis->u = u;
     analysis->mna_matrix = mna_matrix;
