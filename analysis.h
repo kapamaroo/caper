@@ -33,8 +33,6 @@ struct analysis_info {
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
 
-void print_int_array(unsigned long row, unsigned long col, int *p);
-void print_char_int_array(unsigned long row, unsigned long col, char *p);
 void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p);
 
 #endif

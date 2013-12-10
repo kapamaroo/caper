@@ -695,48 +695,6 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     close_logfiles(netlist);
 }
 
-void print_int_array(unsigned long row, unsigned long col, int *p) {
-    unsigned long i;
-    unsigned long j;
-
-    printf("==============================================\n");
-    printf("      ");
-    for (j=0; j<col; ++j) {
-        printf("%2lu|",j);
-    }
-    printf("\n     ___________________________________________\n");
-
-    for (i=0; i<row; ++i) {
-        printf("%3lu | ",i + 1);
-        for (j=0; j<col; ++j) {
-            int val = p[i*col + j];
-            printf("% 2d ",val);
-        }
-        printf("\n");
-    }
-}
-
-void print_char_int_array(unsigned long row, unsigned long col, char *p) {
-    unsigned long i;
-    unsigned long j;
-
-    printf("==============================================\n");
-    printf("      ");
-    for (j=0; j<col; ++j) {
-        printf("%2lu|",j);
-    }
-    printf("\n     ___________________________________________\n");
-
-    for (i=0; i<row; ++i) {
-        printf("%3lu | ",i + 1);
-        for (j=0; j<col; ++j) {
-            int val = p[i*col + j];
-            printf("% 2d ",val);
-        }
-        printf("\n");
-    }
-}
-
 void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p) {
     unsigned long i;
     unsigned long j;
