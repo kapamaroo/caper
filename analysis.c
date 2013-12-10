@@ -139,6 +139,24 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
     analysis->x = x;
+    analysis->LU_perm = NULL;
+}
+
+void decomp_LU(struct analysis_info *analysis) {
+    printf("debug: exec %s\n",__FUNCTION__);
+    unsigned long mna_dim_size =
+        analysis->n + analysis->el_group2_size;
+
+    //GSL magic
+    gsl_matrix_view Aview =
+        gsl_matrix_view_array(analysis->mna_matrix,
+                              mna_dim_size,
+                              mna_dim_size);
+
+    analysis->LU_perm = gsl_permutation_alloc(mna_dim_size);
+
+    int perm_sign;
+    gsl_linalg_LU_decomp(&Aview.matrix,analysis->LU_perm,&perm_sign);
 }
 
 void solve_LU(struct analysis_info *analysis) {
@@ -160,11 +178,8 @@ void solve_LU(struct analysis_info *analysis) {
         gsl_vector_view_array(analysis->x,
                               mna_dim_size);
 
-    gsl_permutation *perm = gsl_permutation_alloc(mna_dim_size);
-
-    int perm_sign;
-    gsl_linalg_LU_decomp(&Aview.matrix,perm,&perm_sign);
-    gsl_linalg_LU_solve(&Aview.matrix,perm,&bview.vector,&x.vector);
+    assert(analysis->LU_perm);
+    gsl_linalg_LU_solve(&Aview.matrix,analysis->LU_perm,&bview.vector,&x.vector);
 }
 
 void decomp_cholesky(struct analysis_info *analysis) {
@@ -562,6 +577,7 @@ static void analyse_dc(struct cmd_dc *dc, struct netlist_info *netlist,
     //preparation
     switch (_solver) {
     case S_SPD:  decomp_cholesky(analysis);  break;
+    case S_LU:   decomp_LU(analysis);        break;
     default:                                 break;
     }
 
@@ -688,7 +704,8 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
                       solve_cholesky(analysis);   break;
     case S_ITER:      solve_bi_cg(analysis,tol);  break;
     case S_SPD_ITER:  solve_cg(analysis,tol);     break;
-    case S_LU:        solve_LU(analysis);         break;
+    case S_LU:        decomp_LU(analysis);
+                      solve_LU(analysis);         break;
     }
 
     write_results(netlist,analysis);

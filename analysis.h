@@ -2,6 +2,7 @@
 #define __ANALYSIS_H__
 
 #include "datatypes.h"
+#include "gsl/gsl_permutation.h"
 
 struct analysis_info {
     int error;
@@ -26,6 +27,8 @@ struct analysis_info {
                   //('el_size' elements)
 
     dfloat_t *x;  //solution vector
+
+    gsl_permutation *LU_perm;
 
     dfloat_t *mna_matrix;
     dfloat_t *mna_vector;
