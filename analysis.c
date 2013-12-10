@@ -94,31 +94,25 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
 
     //ignore ground node
     for (i=1; i<=_n; ++i) {
-        struct  node *_node = &netlist->node_pool[i];
+        struct node *_node = &netlist->node_pool[i];
         for (j=0; j<_node->refs; ++j) {
             struct element *el = _node->attached_el[j]._el;
-            if (el->type == 'r') {
-                //NOTE: all rows are moved up by one (we ingore the ground node)
-                unsigned long vplus = el->r->vplus.nuid;
-                unsigned long vminus = el->r->vminus.nuid;
+            switch (el->type) {
+            case 'r': {
                 assert(_node == el->r->vplus._node || _node == el->r->vminus._node);
-
+                unsigned long this_node  = (_node == el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
+                unsigned long other_node = (_node != el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
                 dfloat_t value = 1/el->value;
 
-                if (vplus)
-                    mna_matrix[(vplus-1)*mna_dim_size + vplus - 1]
-                        += vminus ? value/2 : value;
-
-                if (vminus)
-                    mna_matrix[(vminus-1)*mna_dim_size + vminus - 1]
-                        += vplus ? value/2 : value;
-
-                if (vplus && vminus) {
-                    mna_matrix[(vplus-1)*mna_dim_size + vminus - 1] += -value/2;
-                    mna_matrix[(vminus-1)*mna_dim_size + vplus - 1] += -value/2;
+                //NOTE: all rows are moved up by one (we ingore the ground node)
+                if (this_node--) {
+                    mna_matrix[this_node*mna_dim_size + this_node] += value;        //diagonal entry
+                    if (other_node--)
+                        mna_matrix[this_node*mna_dim_size + other_node] += -value;  //off diagonal entry
                 }
+                break;
             }
-            else if (el->type == 'v') {
+            case 'v': {
                 assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
 
                 //ignore ground node
@@ -132,9 +126,10 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                     //group2 element, populate A2 transposed
                     mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
                 }
+                mna_vector[_n + el->idx] = el->value;
+                break;
             }
-#if 1
-            else if (el->type == 'l') {
+            case 'l': {
                 assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
 
                 //ignore ground node
@@ -149,15 +144,13 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                     //group2 element, populate A2 transposed
                     mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
                 }
+                break;
             }
-#endif
-            switch (el->type) {
-            case 'v':  mna_vector[_n + el->idx] = el->value;  break;
             case 'i': {
                 assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
                 //we have -A1*S1, therefore we subtract from the final result
-                mna_vector[i] -=
-                    (_node == el->i->vminus._node) ? -el->value :  el->value;
+                mna_vector[_node->nuid - 1] -=
+                    (_node == el->i->vminus._node) ? -el->value : el->value;
                 break;
             }
             default:  break;
@@ -204,6 +197,20 @@ void solve_LU(struct analysis_info *analysis) {
     gsl_linalg_LU_solve(&Aview.matrix,perm,&bview.vector,&x.vector);
 }
 
+void decomp_cholesky(struct analysis_info *analysis) {
+    printf("debug: exec %s\n",__FUNCTION__);
+    unsigned long mna_dim_size =
+        analysis->n + analysis->el_group2_size;
+
+    //GSL magic
+    gsl_matrix_view Aview =
+        gsl_matrix_view_array(analysis->mna_matrix,
+                              mna_dim_size,
+                              mna_dim_size);
+
+    gsl_linalg_cholesky_decomp(&Aview.matrix);
+}
+
 void solve_cholesky(struct analysis_info *analysis) {
     printf("debug: exec %s\n",__FUNCTION__);
     unsigned long mna_dim_size =
@@ -223,7 +230,6 @@ void solve_cholesky(struct analysis_info *analysis) {
         gsl_vector_view_array(analysis->x,
                               mna_dim_size);
 
-    gsl_linalg_cholesky_decomp(&Aview.matrix);
     gsl_linalg_cholesky_solve(&Aview.matrix,&bview.vector,&x.vector);
 }
 
@@ -579,78 +585,64 @@ static dfloat_t get_tolerance(struct command *pool, unsigned long size) {
 
 static void analyse_dc(struct cmd_dc *dc, struct netlist_info *netlist,
                        struct analysis_info *analysis) {
-    unsigned long _n = analysis->n;
-    unsigned long mna_dim_size = _n + analysis->el_group2_size;
-    dfloat_t *backup_mna_matrix = analysis->mna_matrix;
-    dfloat_t *backup_mna_vector = analysis->mna_vector;
+    enum solver _solver = get_solver(netlist->cmd_pool,netlist->cmd_pool_size);
+    dfloat_t tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);
+    printf("debug: tolerance value = %g\n",tol);
 
-    dfloat_t *new_mna_matrix = (dfloat_t*)malloc(mna_dim_size * mna_dim_size * sizeof(dfloat_t));
-    if (!new_mna_matrix) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
+    //preparation
+    switch (_solver) {
+    case S_SPD:  decomp_cholesky(analysis);  break;
+    default:                                 break;
     }
 
-    dfloat_t *new_mna_vector = (dfloat_t*)malloc(mna_dim_size * sizeof(dfloat_t));
-    if (!new_mna_vector) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
+    unsigned long _n = analysis->n;
+
+    //init mna_vector
+    struct element *el = dc->source._el;
+    switch (el->type) {
+    case 'v': {
+        analysis->mna_vector[_n + el->idx] = dc->begin;
+        break;
+    }
+    case 'i': {
+        //we have -A1*S1, therefore we subtract from the final result
+        if (el->i->vplus._node->nuid) {
+            unsigned long idx = el->i->vplus._node->nuid - 1;
+            analysis->mna_vector[idx] -= dc->begin - el->value;
+        }
+        if (el->i->vminus._node->nuid) {
+            unsigned long idx = el->i->vminus._node->nuid - 1;
+            analysis->mna_vector[idx] += dc->begin - el->value;
+        }
+        break;
+    }
+    default:  assert(0);
     }
 
     unsigned long i;
-    dfloat_t dc_value = dc->begin;
     unsigned long repeat = (dc->end - dc->begin)/dc->step;
-    for (i=0; i<repeat; ++i,dc_value+=dc->step) {
-        memcpy(new_mna_matrix,backup_mna_matrix,mna_dim_size*mna_dim_size*sizeof(dfloat_t));
-        memcpy(new_mna_vector,backup_mna_vector,mna_dim_size*sizeof(dfloat_t));
-        analysis->mna_matrix = new_mna_matrix;
-        analysis->mna_vector = new_mna_vector;
-
-        //update mna_matrix and mna_vector
+    for (i=0; i<repeat; ++i) {
         struct element *el = dc->source._el;
         switch (el->type) {
-        case 'v':
-            if (el->v->vplus._node->nuid) {
-                unsigned long row = el->_vi->vplus._node->nuid - 1;
-                dfloat_t value = 1;
-
-                //group2 element, populate A2
-                analysis->mna_matrix[row*mna_dim_size + _n + el->idx] = value;
-
-                //group2 element, populate A2 transposed
-                analysis->mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
-            }
-
-            if (el->v->vminus._node->nuid) {
-                unsigned long row = el->_vi->vminus._node->nuid - 1;
-                dfloat_t value = -1;
-
-                //group2 element, populate A2
-                analysis->mna_matrix[row*mna_dim_size + _n + el->idx] = value;
-
-                //group2 element, populate A2 transposed
-                analysis->mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
-            }
-
-            analysis->mna_vector[_n + el->idx] = dc_value;
+        case 'v': {
+            //update mna_vector
+            analysis->mna_vector[_n + el->idx] += dc->step;
             break;
-        case 'i':
+        }
+        case 'i': {
             //we have -A1*S1, therefore we subtract from the final result
             if (el->i->vplus._node->nuid) {
-                unsigned long idx = el->i->vplus._node->nuid;
-                analysis->mna_vector[idx] -= el->value;
+                unsigned long idx = el->i->vplus._node->nuid - 1;
+                analysis->mna_vector[idx] -= dc->step;
             }
             if (el->i->vminus._node->nuid) {
-                unsigned long idx = el->i->vminus._node->nuid;
-                analysis->mna_vector[idx] -= -el->value;
+                unsigned long idx = el->i->vminus._node->nuid - 1;
+                analysis->mna_vector[idx] += dc->step;
             }
-
             break;
+        }
         default:  assert(0);
         }
-
-        enum solver _solver = get_solver(netlist->cmd_pool,netlist->cmd_pool_size);
-        dfloat_t tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);
-        printf("debug: tolerance value = %g\n",tol);
 
         switch (_solver) {
         case S_SPD:       solve_cholesky(analysis);   break;
@@ -662,14 +654,9 @@ static void analyse_dc(struct cmd_dc *dc, struct netlist_info *netlist,
         write_results(netlist,analysis);
 
         //printf("\n***    repeat(%4lu) : Solution Vector (x)\n",i);
+        //unsigned long mna_dim_size = _n + analysis->el_group2_size;
         //print_dfloat_array(mna_dim_size,1,analysis->x);
     }
-
-    //restore original mna_matrix and mna_vector
-    analysis->mna_matrix = backup_mna_matrix;
-    analysis->mna_vector = backup_mna_vector;
-    free(new_mna_matrix);
-    free(new_mna_vector);
 }
 
 static void open_logfiles(struct netlist_info *netlist) {
@@ -727,7 +714,8 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     printf("debug: tolerance value = %g\n",tol);
 
     switch (_solver) {
-    case S_SPD:       solve_cholesky(analysis);   break;
+    case S_SPD:       decomp_cholesky(analysis);
+                      solve_cholesky(analysis);   break;
     case S_ITER:      solve_bi_cg(analysis,tol);  break;
     case S_SPD_ITER:  solve_cg(analysis,tol);     break;
     case S_LU:        solve_LU(analysis);         break;
