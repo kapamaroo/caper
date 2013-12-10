@@ -702,7 +702,7 @@ void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p) {
     printf("==============================================\n");
     printf("      ");
     for (j=0; j<col; ++j) {
-        printf("%5lu|",j);
+        printf("%9lu|",j);
     }
     printf("\n     ___________________________________________\n");
 
@@ -710,7 +710,7 @@ void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p) {
         printf("%3lu | ",i + 1);
         for (j=0; j<col; ++j) {
             dfloat_t val = p[i*col + j];
-            printf("%5.2g ",val);
+            printf("%+.2e ",val);
         }
         printf("\n");
     }
