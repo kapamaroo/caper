@@ -34,8 +34,8 @@ enum cmd_type {
 enum cmd_option_type {
     CMD_OPT_SPD = 0,
     CMD_OPT_ITER,
-    CMD_OPT_SPD_ITER,
     CMD_OPT_ITOL,
+    CMD_OPT_SPARSE,
     CMD_OPT_BAD_OPTION  //must be last
 };
 
@@ -92,7 +92,7 @@ struct command {
     enum cmd_type type;
     dfloat_t value;
     union {
-        enum cmd_option_type option_type;
+        int option[CMD_OPT_BAD_OPTION + 1];
         struct cmd_dc dc;
         struct cmd_print_plot print_plot;
     };

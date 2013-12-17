@@ -531,13 +531,14 @@ enum solver {
     S_SPD_ITER
 };
 
-static inline enum solver option_to_solver(enum cmd_option_type option_type) {
-    switch (option_type) {
-    case CMD_OPT_SPD:       return S_SPD;
-    case CMD_OPT_ITER:      return S_ITER;
-    case CMD_OPT_SPD_ITER:  return S_SPD_ITER;
-    default:                return S_LU;
-    }
+static inline enum solver option_to_solver(int *option) {
+    if (option[CMD_OPT_SPD] && option[CMD_OPT_ITER])
+        return S_SPD_ITER;
+    else if (option[CMD_OPT_SPD])
+        return S_SPD;
+    else if (option[CMD_OPT_ITER])
+        return S_ITER;
+    return S_LU;
 }
 
 static enum solver get_solver(struct command *pool, unsigned long size) {
@@ -547,7 +548,7 @@ static enum solver get_solver(struct command *pool, unsigned long size) {
     for (i=0; i<size; ++i) {
         struct command *cmd = &pool[size - 1 - i];
         if (cmd->type == CMD_OPTION) {
-            enum solver _solver = option_to_solver(cmd->option_type);
+            enum solver _solver = option_to_solver(cmd->option);
             if (_solver != S_LU)
                 return _solver;
         }
@@ -561,11 +562,20 @@ static dfloat_t get_tolerance(struct command *pool, unsigned long size) {
     unsigned long i;
     for (i=0; i<size; ++i) {
         struct command *cmd = &pool[size - 1 - i];
-        if (cmd->type == CMD_OPTION &&
-            cmd->option_type == CMD_OPT_ITOL)
+        if (cmd->type == CMD_OPTION && cmd->option[CMD_OPT_ITOL])
             return cmd->value;
     }
     return DEFAULT_TOL;
+}
+
+static int use_sparse(struct command *pool, unsigned long size) {
+    unsigned long i;
+    for (i=0; i<size; ++i) {
+        struct command *cmd = &pool[size - 1 - i];
+        if (cmd->type == CMD_OPTION && cmd->option[CMD_OPT_SPARSE])
+            return 1;
+    }
+    return 0;
 }
 
 static void analyse_init_solver(struct analysis_info *analysis,

@@ -943,7 +943,7 @@ void parse_comment(char **buf) {
 static const char *cmd_base[] = { "option", "dc", "plot", "print" };
 
 //these must be in the same order as in the enum cmd_opt_type in datatypes.h
-static const char *cmd_opt_base[] = { "spd", "iter", "spd iter", "itol" };
+static const char *cmd_opt_base[] = { "spd", "iter", "itol", "sparse" };
 
 static inline enum cmd_type get_cmd_type(char *cmd) {
     int i;
@@ -954,6 +954,9 @@ static inline enum cmd_type get_cmd_type(char *cmd) {
 }
 
 static inline enum cmd_option_type get_cmd_opt_type(char *opt) {
+    assert(opt);
+    assert(sizeof(cmd_opt_base)/sizeof(char *) == CMD_OPT_BAD_OPTION
+           && "unbalanced cmd_opt_base and enum cmd_option_type");
     int i;
     for (i=0; i<CMD_OPT_SIZE; ++i)
         if (strcmp(opt, cmd_opt_base[i]) == 0)
@@ -1036,6 +1039,19 @@ void parse_print_plot_item(char **buf, struct command *cmd) {
     parse_eat_whitechars(buf);
 }
 
+static enum cmd_option_type parse_option(char **buf) {
+    parse_eat_whitechars(buf);
+    char *backup_pos = *buf;
+    char *option = parse_string(buf,"option");
+    enum cmd_option_type type = get_cmd_opt_type(option);
+    if (type == CMD_OPT_BAD_OPTION) {
+        printf("***  WARNING  ***    Unknown .option argument '%s' - error\n",option);
+        *buf = backup_pos;
+    }
+    free(option);
+    return type;
+}
+
 void parse_command(char **buf) {
     //printf("in function: %s\n",__FUNCTION__);
 
@@ -1051,13 +1067,22 @@ void parse_command(char **buf) {
         return;
     }
 
-    struct command new_cmd = {.type=type};
+    struct command new_cmd;
+    memset(&new_cmd,0,sizeof(new_cmd));
+    new_cmd.type = type;
 
     switch (type) {
     case CMD_OPTION: {
+#if 1
+        do {
+            enum cmd_option_type type = parse_option(buf);
+            new_cmd.option[type] = 1;
+            if (new_cmd.option[CMD_OPT_BAD_OPTION])
+                return;
+        } while (*buf && !isdelimiter(**buf));
+#else
         char *opt = parse_string(buf,".option argument");
         enum cmd_option_type opt_type = get_cmd_opt_type(opt);
-
         switch (opt_type) {
         case CMD_OPT_BAD_OPTION:
             printf("***  WARNING  ***    Unknown .option argument '%s' - error\n",opt);
@@ -1095,6 +1120,7 @@ void parse_command(char **buf) {
             break;
         }
         }
+#endif
         break;
     }
     case CMD_DC: {

@@ -1,4 +1,5 @@
 .xxx
-.option spd
+.option spd iter sparse
+.option iter sparse spd
 .option zzz
 .option
