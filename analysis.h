@@ -2,7 +2,8 @@
 #define __ANALYSIS_H__
 
 #include "datatypes.h"
-#include "gsl/gsl_permutation.h"
+#include <gsl/gsl_permutation.h>
+#include "csparse/csparse.h"
 
 struct analysis_info {
     int error;
@@ -32,6 +33,9 @@ struct analysis_info {
 
     dfloat_t *mna_matrix;
     dfloat_t *mna_vector;
+
+    //sparse matrix struct
+    cs *cs_mna_matrix;
 };
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);

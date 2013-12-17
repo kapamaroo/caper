@@ -8,6 +8,7 @@
 #include <string.h>
 #include <gsl/gsl_linalg.h>
 #include <math.h>
+#include "csparse/csparse.h"
 
 #define BI_CG_EPSILON 1e-14
 
@@ -137,6 +138,167 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->v = v;
     analysis->u = u;
     analysis->mna_matrix = mna_matrix;
+    analysis->mna_vector = mna_vector;
+    analysis->x = x;
+    analysis->LU_perm = NULL;
+}
+
+void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *analysis) {
+    assert(netlist);
+    assert(analysis);
+
+    //the last node we care
+    //also the number of nodes without considering the ground
+    unsigned long _n = netlist->n - 1;
+    unsigned long e = netlist->e;
+    unsigned long el_group1_size = netlist->el_group1_size;
+    unsigned long el_group2_size = netlist->el_group2_size;
+
+    unsigned long mna_dim_size = _n + el_group2_size;
+    printf("analysis: trying to allocate %lu bytes ...\n",
+           mna_dim_size * mna_dim_size * sizeof(dfloat_t));
+
+    //assume that G has 3 diagonals full with nonzero elements
+    //and A2 and A2^T has 2 diagonals full of nonzero elements
+    unsigned long nonzeros = _n * 3 + 2 * el_group2_size * 2;
+
+    cs *cs_mna_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
+    if (!cs_mna_matrix) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *mna_vector = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
+    if (!mna_vector) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *x = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    //dfloat_t *x = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
+    if (!x) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *v = (dfloat_t*)calloc((_n), sizeof(dfloat_t));
+    if (!v) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *u = (dfloat_t*)calloc(e, sizeof(dfloat_t));
+    if (!u) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("analysis: populating matrices ...\n");
+
+    unsigned long i;
+    unsigned long j;
+    unsigned long next = 0;
+
+    //populate MNA Matrix
+
+    //ignore ground node
+    for (i=1; i<=_n; ++i) {
+        struct node *_node = &netlist->node_pool[i];
+        for (j=0; j<_node->refs; ++j) {
+            struct element *el = _node->attached_el[j]._el;
+            switch (el->type) {
+            case 'r': {
+                assert(_node == el->r->vplus._node || _node == el->r->vminus._node);
+                unsigned long this_node  = (_node == el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
+                unsigned long other_node = (_node != el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
+                dfloat_t value = 1/el->value;
+
+                //NOTE: all rows are moved up by one (we ingore the ground node)
+                if (this_node--) {
+                    //mna_matrix[this_node*mna_dim_size + this_node] += value;        //diagonal entry
+                    cs_mna_matrix->i[next] = this_node;
+                    cs_mna_matrix->p[next] = this_node;
+                    cs_mna_matrix->x[next] = value;
+                    next++;
+                    if (other_node--) {
+                        //mna_matrix[this_node*mna_dim_size + other_node] += -value;  //off diagonal entry
+                        cs_mna_matrix->i[next] = this_node;
+                        cs_mna_matrix->p[next] = other_node;
+                        cs_mna_matrix->x[next] = value;
+                        next++;
+                    }
+                }
+                break;
+            }
+            case 'v': {
+                assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
+
+                //ignore ground node
+                if (_node->nuid) {
+                    unsigned long row = _node->nuid - 1;
+                    dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
+
+                    //group2 element, populate A2
+                    //mna_matrix[row*mna_dim_size + _n + el->idx] = value;
+                    cs_mna_matrix->i[next] = row;
+                    cs_mna_matrix->p[next] = _n + el->idx;
+                    cs_mna_matrix->x[next] = value;
+                    next++;
+
+                    //group2 element, populate A2 transposed
+                    //mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
+                    cs_mna_matrix->i[next] = _n + el->idx;
+                    cs_mna_matrix->p[next] = row;
+                    cs_mna_matrix->x[next] = value;
+                    next++;
+                }
+                mna_vector[_n + el->idx] = el->value;
+                break;
+            }
+            case 'l': {
+                assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
+
+                //ignore ground node
+                if (_node->nuid) {
+                    unsigned long row = _node->nuid - 1;
+                    dfloat_t value = (_node == el->l->vplus._node) ? +1 : -1;
+                    //dfloat_t value = (_node == el->l->vplus._node) ? el->value : -el->value;
+
+                    //group2 element, populate A2
+                    //mna_matrix[row*mna_dim_size + _n + el->idx] = value;
+                    cs_mna_matrix->i[next] = row;
+                    cs_mna_matrix->p[next] = _n + el->idx;
+                    cs_mna_matrix->x[next] = value;
+                    next++;
+
+                    //group2 element, populate A2 transposed
+                    //mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
+                    cs_mna_matrix->i[next] = _n + el->idx;
+                    cs_mna_matrix->p[next] = row;
+                    cs_mna_matrix->x[next] = value;
+                    next++;
+                }
+                break;
+            }
+            case 'i': {
+                assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
+                //we have -A1*S1, therefore we subtract from the final result
+                mna_vector[_node->nuid - 1] -=
+                    (_node == el->i->vminus._node) ? -el->value : el->value;
+                break;
+            }
+            default:  break;
+            }
+        }
+    }
+
+    analysis->n = _n;
+    analysis->e = e;
+    analysis->el_group1_size = el_group1_size;
+    analysis->el_group2_size = el_group2_size;
+    analysis->v = v;
+    analysis->u = u;
+    analysis->cs_mna_matrix = cs_mna_matrix;
     analysis->mna_vector = mna_vector;
     analysis->x = x;
     analysis->LU_perm = NULL;
@@ -568,7 +730,7 @@ static dfloat_t get_tolerance(struct command *pool, unsigned long size) {
     return DEFAULT_TOL;
 }
 
-static int use_sparse(struct command *pool, unsigned long size) {
+static int get_sparse(struct command *pool, unsigned long size) {
     unsigned long i;
     for (i=0; i<size; ++i) {
         struct command *cmd = &pool[size - 1 - i];
@@ -706,7 +868,12 @@ static void close_logfiles(struct netlist_info *netlist) {
 }
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
-    analysis_init(netlist,analysis);
+    int use_sparse = get_sparse(netlist->cmd_pool,netlist->cmd_pool_size);
+
+    if (use_sparse)
+        analysis_init_sparse(netlist,analysis);
+    else
+        analysis_init(netlist,analysis);
 
     enum solver _solver = get_solver(netlist->cmd_pool,netlist->cmd_pool_size);
     dfloat_t tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);

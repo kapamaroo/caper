@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -g -lgsl -lgslcblas -lm
 #CFLAGS=-Wall -O3 -march=native -lm
 DEPS = parser.h datatypes.h analysis.h hash.h
-OBJ = main.o parser.o analysis.o hash.o
+OBJ = main.o parser.o analysis.o hash.o csparse/csparse.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
