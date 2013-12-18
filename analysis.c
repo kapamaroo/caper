@@ -12,9 +12,15 @@
 
 #define BI_CG_EPSILON 1e-14
 
-void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
-    assert(netlist);
-    assert(analysis);
+void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *analysis);
+static int get_sparse(struct command *pool, unsigned long size);
+
+void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis, const int use_sparse) {
+    if (use_sparse) {
+        analysis_init_sparse(netlist,analysis);
+        printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
+        return;
+    }
 
     //the last node we care
     //also the number of nodes without considering the ground
@@ -46,6 +52,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         exit(EXIT_FAILURE);
     }
 
+#if 0
     dfloat_t *v = (dfloat_t*)calloc((_n), sizeof(dfloat_t));
     if (!v) {
         perror(__FUNCTION__);
@@ -57,6 +64,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+#endif
 
     printf("analysis: populating matrices ...\n");
 
@@ -135,18 +143,75 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
     analysis->el_group2_size = el_group2_size;
+#if 0
     analysis->v = v;
     analysis->u = u;
+#endif
+    analysis->x = x;
     analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
-    analysis->x = x;
-    analysis->LU_perm = NULL;
+}
+
+static unsigned long count_nonzeros(struct netlist_info *netlist) {
+    unsigned long i;
+    unsigned long j;
+
+    unsigned long _n = netlist->n - 1;
+    unsigned long nonzeros = 0;
+
+    //ignore ground node
+    for (i=1; i<=_n; ++i) {
+        struct node *_node = &netlist->node_pool[i];
+        for (j=0; j<_node->refs; ++j) {
+            struct element *el = _node->attached_el[j]._el;
+            switch (el->type) {
+            case 'r': {
+                assert(_node == el->r->vplus._node || _node == el->r->vminus._node);
+                unsigned long this_node  = (_node == el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
+                unsigned long other_node = (_node != el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
+
+                //NOTE: all rows are moved up by one (we ingore the ground node)
+                if (this_node--) {
+                    nonzeros++;        //diagonal entry
+                    if (other_node--)
+                        nonzeros++;    //off diagonal entry
+                }
+                break;
+            }
+            case 'v': {
+                assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
+
+                //ignore ground node
+                if (_node->nuid) {
+                    //group2 element, populate A2
+                    nonzeros++;
+
+                    //group2 element, populate A2 transposed
+                    nonzeros++;
+                }
+                break;
+            }
+            case 'l': {
+                assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
+
+                //ignore ground node
+                if (_node->nuid) {
+                    //group2 element, populate A2
+                    nonzeros++;
+
+                    //group2 element, populate A2 transposed
+                    nonzeros++;
+                }
+                break;
+            }
+            default:  break;
+            }
+        }
+    }
+    return nonzeros;
 }
 
 void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *analysis) {
-    assert(netlist);
-    assert(analysis);
-
     //the last node we care
     //also the number of nodes without considering the ground
     unsigned long _n = netlist->n - 1;
@@ -158,9 +223,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
     printf("analysis: trying to allocate %lu bytes ...\n",
            mna_dim_size * mna_dim_size * sizeof(dfloat_t));
 
-    //assume that G has 3 diagonals full with nonzero elements
-    //and A2 and A2^T has 2 diagonals full of nonzero elements
-    unsigned long nonzeros = _n * 3 + 2 * el_group2_size * 2;
+    unsigned long nonzeros = count_nonzeros(netlist);
 
     cs *cs_mna_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
     if (!cs_mna_matrix) {
@@ -181,6 +244,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
         exit(EXIT_FAILURE);
     }
 
+#if 0
     dfloat_t *v = (dfloat_t*)calloc((_n), sizeof(dfloat_t));
     if (!v) {
         perror(__FUNCTION__);
@@ -192,6 +256,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+#endif
 
     printf("analysis: populating matrices ...\n");
 
@@ -292,16 +357,24 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
         }
     }
 
+    assert(next == nonzeros);
+    cs_mna_matrix = cs_compress(cs_mna_matrix);
+    if (!cs_dupl(cs_mna_matrix)) {
+        printf("cs_dupl() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+
     analysis->n = _n;
     analysis->e = e;
     analysis->el_group1_size = el_group1_size;
     analysis->el_group2_size = el_group2_size;
+#if 0
     analysis->v = v;
     analysis->u = u;
-    analysis->cs_mna_matrix = cs_mna_matrix;
-    analysis->mna_vector = mna_vector;
+#endif
     analysis->x = x;
-    analysis->LU_perm = NULL;
+    analysis->mna_vector = mna_vector;
+    analysis->cs_mna_matrix = cs_mna_matrix;
 }
 
 void decomp_LU(struct analysis_info *analysis) {
@@ -378,6 +451,114 @@ void solve_cholesky(struct analysis_info *analysis) {
                               mna_dim_size);
 
     gsl_linalg_cholesky_solve(&Aview.matrix,&bview.vector,&x.vector);
+}
+
+void decomp_LU_sparse(struct analysis_info *analysis) {
+    printf("debug: exec %s\n",__FUNCTION__);
+
+    //sparse magic
+    css *S = cs_sqr(2,analysis->cs_mna_matrix,0);
+    if (!S) {
+        printf("cs_sqr() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    csn *N = cs_lu(analysis->cs_mna_matrix,S,1);
+    if (!N) {
+        printf("cs_lu() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    analysis->cs_mna_S = S;
+    analysis->cs_mna_N = N;
+    cs_free(analysis->cs_mna_matrix);
+    analysis->cs_mna_matrix = NULL;
+}
+
+void solve_LU_sparse(struct analysis_info *analysis) {
+    printf("debug: exec %s\n",__FUNCTION__);
+    unsigned long mna_dim_size =
+        analysis->n + analysis->el_group2_size;
+
+    //sparse magic
+    assert(analysis->cs_mna_N);
+    assert(analysis->cs_mna_S);
+
+    csn *N = analysis->cs_mna_N;
+    css *S = analysis->cs_mna_S;
+    dfloat_t *b = analysis->mna_vector;
+    dfloat_t *x = analysis->x;
+
+    if (!cs_ipvec(N->pinv,b,x,mna_dim_size)) {
+        printf("cs_ipvec() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cs_lsolve(N->L,x)) {
+        printf("cs_lsolve() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cs_usolve(N->U,x)) {
+        printf("cs_usolve() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cs_ipvec(S->q,x,b,mna_dim_size)) {
+        printf("cs_ipvec() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void decomp_cholesky_sparse(struct analysis_info *analysis) {
+    printf("debug: exec %s\n",__FUNCTION__);
+
+    //sparse magic
+    css *S = cs_schol(1,analysis->cs_mna_matrix);
+    if (!S) {
+        printf("cs_schol() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    csn *N = cs_chol(analysis->cs_mna_matrix,S);
+    if (!N) {
+        printf("cs_chol() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    analysis->cs_mna_S = S;
+    analysis->cs_mna_N = N;
+    cs_free(analysis->cs_mna_matrix);
+    analysis->cs_mna_matrix = NULL;
+}
+
+void solve_cholesky_sparse(struct analysis_info *analysis) {
+    printf("debug: exec %s\n",__FUNCTION__);
+    unsigned long mna_dim_size =
+        analysis->n + analysis->el_group2_size;
+
+    //sparse magic
+    assert(analysis->cs_mna_N);
+    assert(analysis->cs_mna_S);
+
+    csn *N = analysis->cs_mna_N;
+    css *S = analysis->cs_mna_S;
+    dfloat_t *b = analysis->mna_vector;
+    dfloat_t *x = analysis->x;
+
+    if (!cs_ipvec(S->pinv,b,x,mna_dim_size)) {
+        printf("cs_ipvec() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cs_lsolve(N->L,x)) {
+        printf("cs_lsolve() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cs_ltsolve(N->L,x)) {
+        printf("cs_ltsolve() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!cs_pvec(S->pinv,x,b,mna_dim_size)) {
+        printf("cs_pvec() failed - exit.\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 static inline dfloat_t *init_preconditioner(dfloat_t *M, dfloat_t *z, dfloat_t *r, unsigned long mna_dim_size) {
@@ -512,6 +693,10 @@ void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
     free(_M);
     free(_p);
     free(_q);
+}
+
+void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
+    assert(0 && "implement me!");
 }
 
 void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
@@ -649,6 +834,10 @@ void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
     free(_q_);
 }
 
+void solve_bi_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
+    assert(0 && "implement me!");
+}
+
 static void write_result(FILE *f, struct cmd_print_plot_item *item, struct analysis_info *analysis) {
     dfloat_t value = 0;
     char *name = NULL;
@@ -690,11 +879,35 @@ enum solver {
     S_LU = 0,
     S_SPD,
     S_ITER,
-    S_SPD_ITER
+    S_SPD_ITER,
+
+    S_LU_SPARSE,
+    S_SPD_SPARSE,
+    S_ITER_SPARSE,
+    S_SPD_ITER_SPARSE
 };
 
-static inline enum solver option_to_solver(int *option) {
-    if (option[CMD_OPT_SPD] && option[CMD_OPT_ITER])
+static int get_sparse(struct command *pool, unsigned long size) {
+    unsigned long i;
+    for (i=0; i<size; ++i) {
+        struct command *cmd = &pool[size - 1 - i];
+        if (cmd->type == CMD_OPTION && cmd->option[CMD_OPT_SPARSE])
+            return 1;
+    }
+    return 0;
+}
+
+static inline enum solver option_to_solver(int *option, const int use_sparse) {
+    if (use_sparse) {
+        if (option[CMD_OPT_SPD] && option[CMD_OPT_ITER])
+            return S_SPD_ITER_SPARSE;
+        else if (option[CMD_OPT_SPD])
+            return S_SPD_SPARSE;
+        else if (option[CMD_OPT_ITER])
+            return S_ITER_SPARSE;
+        return S_LU_SPARSE;
+    }
+    else if (option[CMD_OPT_SPD] && option[CMD_OPT_ITER])
         return S_SPD_ITER;
     else if (option[CMD_OPT_SPD])
         return S_SPD;
@@ -703,19 +916,19 @@ static inline enum solver option_to_solver(int *option) {
     return S_LU;
 }
 
-static enum solver get_solver(struct command *pool, unsigned long size) {
+static enum solver get_solver(struct command *pool, unsigned long size, const int use_sparse) {
     //last solver wins!
 
     unsigned long i;
     for (i=0; i<size; ++i) {
         struct command *cmd = &pool[size - 1 - i];
         if (cmd->type == CMD_OPTION) {
-            enum solver _solver = option_to_solver(cmd->option);
-            if (_solver != S_LU)
+            enum solver _solver = option_to_solver(cmd->option,use_sparse);
+            if (_solver != S_LU && _solver != S_LU_SPARSE)
                 return _solver;
         }
     }
-    return S_LU;
+    return use_sparse ? S_LU_SPARSE : S_LU;
 }
 
 static dfloat_t get_tolerance(struct command *pool, unsigned long size) {
@@ -730,22 +943,19 @@ static dfloat_t get_tolerance(struct command *pool, unsigned long size) {
     return DEFAULT_TOL;
 }
 
-static int get_sparse(struct command *pool, unsigned long size) {
-    unsigned long i;
-    for (i=0; i<size; ++i) {
-        struct command *cmd = &pool[size - 1 - i];
-        if (cmd->type == CMD_OPTION && cmd->option[CMD_OPT_SPARSE])
-            return 1;
-    }
-    return 0;
-}
-
 static void analyse_init_solver(struct analysis_info *analysis,
                                 enum solver _solver) {
     switch (_solver) {
-    case S_SPD:  decomp_cholesky(analysis);  break;
-    case S_LU:   decomp_LU(analysis);        break;
-    default:                                 break;
+    case S_SPD:       decomp_cholesky(analysis);  break;
+    case S_ITER:                                  break;
+    case S_SPD_ITER:                              break;
+    case S_LU:        decomp_LU(analysis);        break;
+
+        //sparse versions
+    case S_SPD_SPARSE:       decomp_cholesky_sparse(analysis);  break;
+    case S_ITER_SPARSE:                                         break;
+    case S_SPD_ITER_SPARSE:                                     break;
+    case S_LU_SPARSE:        decomp_LU_sparse(analysis);        break;
     }
 }
 
@@ -757,6 +967,12 @@ static void analyse_one_step(struct netlist_info *netlist,
     case S_ITER:      solve_bi_cg(analysis,tol);  break;
     case S_SPD_ITER:  solve_cg(analysis,tol);     break;
     case S_LU:        solve_LU(analysis);         break;
+
+        //sparse versions
+    case S_SPD_SPARSE:       solve_cholesky_sparse(analysis);   break;
+    case S_ITER_SPARSE:      solve_bi_cg_sparse(analysis,tol);  break;
+    case S_SPD_ITER_SPARSE:  solve_cg_sparse(analysis,tol);     break;
+    case S_LU_SPARSE:        solve_LU_sparse(analysis);         break;
     }
     write_results(netlist,analysis);
 }
@@ -868,16 +1084,20 @@ static void close_logfiles(struct netlist_info *netlist) {
 }
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
+    assert(netlist);
+    assert(analysis);
+
+    memset(analysis,0,sizeof(struct analysis_info));
+
     int use_sparse = get_sparse(netlist->cmd_pool,netlist->cmd_pool_size);
-
-    if (use_sparse)
-        analysis_init_sparse(netlist,analysis);
-    else
-        analysis_init(netlist,analysis);
-
-    enum solver _solver = get_solver(netlist->cmd_pool,netlist->cmd_pool_size);
+    enum solver _solver = get_solver(netlist->cmd_pool,netlist->cmd_pool_size,use_sparse);
     dfloat_t tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);
+
     printf("debug: tolerance value = %g\n",tol);
+    printf("debug: use_sparse = %d\n",use_sparse);
+    printf("\n");
+
+    analysis_init(netlist,analysis,use_sparse);
 
     struct command *dc_cmd = NULL;
     unsigned long i;

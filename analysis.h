@@ -8,24 +8,19 @@
 struct analysis_info {
     int error;
 
-    union {
-        unsigned long node_size;  //without the ground node
-        unsigned long n;
-    };
-
-    union {
-        unsigned long el_size;
-        unsigned long e;
-    };
+    unsigned long n;  //number of nodes without the ground node
+    unsigned long e;  //number of branches
 
     unsigned long el_group1_size;
     unsigned long el_group2_size;
 
+#if 0
     dfloat_t *v;  //node's voltage relative to ground
                   //('node_size' elements)
 
     dfloat_t *u;  //element's voltage from vplus(+) to vminus(-) nodes
                   //('el_size' elements)
+#endif
 
     dfloat_t *x;  //solution vector
 
@@ -34,8 +29,10 @@ struct analysis_info {
     dfloat_t *mna_matrix;
     dfloat_t *mna_vector;
 
-    //sparse matrix struct
+    //sparse matrix members
     cs *cs_mna_matrix;
+    csn *cs_mna_N;
+    css *cs_mna_S;
 };
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
