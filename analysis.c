@@ -358,6 +358,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
     }
 
     assert(next == nonzeros);
+    cs_mna_matrix->nz = next;
     cs_mna_matrix = cs_compress(cs_mna_matrix);
     if (!cs_dupl(cs_mna_matrix)) {
         printf("cs_dupl() failed - exit.\n");
