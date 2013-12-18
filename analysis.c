@@ -220,10 +220,12 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
     unsigned long el_group2_size = netlist->el_group2_size;
 
     unsigned long mna_dim_size = _n + el_group2_size;
-    printf("analysis: trying to allocate %lu bytes ...\n",
-           mna_dim_size * mna_dim_size * sizeof(dfloat_t));
 
     unsigned long nonzeros = count_nonzeros(netlist);
+
+    //see cs_spalloc()
+    printf("analysis: trying to allocate %lu bytes ...\n",
+           sizeof(cs) + 2*nonzeros * sizeof(int) + nonzeros * sizeof(dfloat_t));
 
     cs *cs_mna_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
     if (!cs_mna_matrix) {
@@ -262,7 +264,6 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
 
     unsigned long i;
     unsigned long j;
-    unsigned long next = 0;
 
     //populate MNA Matrix
 
@@ -280,18 +281,9 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
 
                 //NOTE: all rows are moved up by one (we ingore the ground node)
                 if (this_node--) {
-                    //mna_matrix[this_node*mna_dim_size + this_node] += value;        //diagonal entry
-                    cs_mna_matrix->i[next] = this_node;
-                    cs_mna_matrix->p[next] = this_node;
-                    cs_mna_matrix->x[next] = value;
-                    next++;
-                    if (other_node--) {
-                        //mna_matrix[this_node*mna_dim_size + other_node] += -value;  //off diagonal entry
-                        cs_mna_matrix->i[next] = this_node;
-                        cs_mna_matrix->p[next] = other_node;
-                        cs_mna_matrix->x[next] = value;
-                        next++;
-                    }
+                    cs_entry(cs_mna_matrix,this_node,this_node,value);  //diagonal entry
+                    if (other_node--)
+                        cs_entry(cs_mna_matrix,this_node,other_node,value);  //off diagonal entry
                 }
                 break;
             }
@@ -304,18 +296,10 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
                     dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
 
                     //group2 element, populate A2
-                    //mna_matrix[row*mna_dim_size + _n + el->idx] = value;
-                    cs_mna_matrix->i[next] = row;
-                    cs_mna_matrix->p[next] = _n + el->idx;
-                    cs_mna_matrix->x[next] = value;
-                    next++;
+                    cs_entry(cs_mna_matrix,row,_n + el->idx,value);
 
                     //group2 element, populate A2 transposed
-                    //mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
-                    cs_mna_matrix->i[next] = _n + el->idx;
-                    cs_mna_matrix->p[next] = row;
-                    cs_mna_matrix->x[next] = value;
-                    next++;
+                    cs_entry(cs_mna_matrix,_n + el->idx,row,value);
                 }
                 mna_vector[_n + el->idx] = el->value;
                 break;
@@ -330,18 +314,10 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
                     //dfloat_t value = (_node == el->l->vplus._node) ? el->value : -el->value;
 
                     //group2 element, populate A2
-                    //mna_matrix[row*mna_dim_size + _n + el->idx] = value;
-                    cs_mna_matrix->i[next] = row;
-                    cs_mna_matrix->p[next] = _n + el->idx;
-                    cs_mna_matrix->x[next] = value;
-                    next++;
+                    cs_entry(cs_mna_matrix,row,_n + el->idx,value);
 
                     //group2 element, populate A2 transposed
-                    //mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
-                    cs_mna_matrix->i[next] = _n + el->idx;
-                    cs_mna_matrix->p[next] = row;
-                    cs_mna_matrix->x[next] = value;
-                    next++;
+                    cs_entry(cs_mna_matrix,_n + el->idx,row,value);
                 }
                 break;
             }
@@ -357,8 +333,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
         }
     }
 
-    assert(next == nonzeros);
-    cs_mna_matrix->nz = next;
+    assert(cs_mna_matrix->nz == nonzeros);
     cs_mna_matrix = cs_compress(cs_mna_matrix);
     if (!cs_dupl(cs_mna_matrix)) {
         printf("cs_dupl() failed - exit.\n");
