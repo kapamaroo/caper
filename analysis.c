@@ -232,6 +232,12 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
+    
+    cs *cs_mna_matrix_triplet = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
+    if (!cs_mna_matrix_triplet) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
 
     dfloat_t *mna_vector = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
     if (!mna_vector) {
@@ -334,6 +340,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
     }
 
     assert(cs_mna_matrix->nz == nonzeros);
+    cs_mna_matrix_triplet = cs_mna_matrix;
     cs_mna_matrix = cs_compress(cs_mna_matrix);
     if (!cs_dupl(cs_mna_matrix)) {
         printf("cs_dupl() failed - exit.\n");
@@ -351,6 +358,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
     analysis->x = x;
     analysis->mna_vector = mna_vector;
     analysis->cs_mna_matrix = cs_mna_matrix;
+    analysis->cs_mna_matrix_triplet = cs_mna_matrix_triplet;
 }
 
 void decomp_LU(struct analysis_info *analysis) {
@@ -672,7 +680,90 @@ void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
 }
 
 void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
-    assert(0 && "implement me!");
+    //assert(0 && "implement me!");
+    printf("debug: exec %s\n",__FUNCTION__);
+    unsigned long _n = analysis->n;
+    unsigned long el_group2_size = analysis->el_group2_size;
+    unsigned long mna_dim_size = _n + el_group2_size;
+
+    //dfloat_t *_r = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    dfloat_t *_r = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
+    if (!_r) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_z = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_z) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_M = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_M) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_p = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_p) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_q = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_q) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    cs *_A = analysis->cs_mna_matrix;
+    cs *_A_triplet = analysis->cs_mna_matrix_triplet;
+    dfloat_t *_b = analysis->mna_vector;
+    dfloat_t *_x = analysis->x;
+
+    //initial values:
+    //                 _x[] = 0,...,0
+    //                 _r = b
+    memset(_x,0,mna_dim_size*sizeof(dfloat_t));
+    memcpy(_r,_b,mna_dim_size*sizeof(dfloat_t));
+    //init_M(_M,_A,mna_dim_size);
+    cs_diagonal_values(_A_triplet,_M,mna_dim_size);
+    dfloat_t rho_old = _dot(_r,_r,mna_dim_size);
+    dfloat_t norm_b = sqrt(_dot(_b,_b,mna_dim_size));
+    if (norm_b == 0)
+        norm_b = 1;
+
+    int i = 0;
+    const int max_iter = mna_dim_size;
+    for (i=0; i<max_iter; ++i) {
+        _z = init_preconditioner(_M,_z,_r,mna_dim_size);
+        dfloat_t rho = _dot(_r,_z,mna_dim_size);
+        if (i == 0)
+            memcpy(_p,_z,mna_dim_size*sizeof(dfloat_t));
+        else {
+            dfloat_t beta = rho/rho_old;
+            _p = _dot_add(_p,_z,beta,_p,mna_dim_size);
+        }
+        rho_old = rho;
+        //_q = _mult(_q,_A,_p,mna_dim_size);
+        if (!cs_gaxpy(_A,_p,_q)) {
+			printf("cs_gaxpy() failed - exit.\n");
+			exit(EXIT_FAILURE);
+		}
+        dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
+        _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
+        _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
+        dfloat_t cond = sqrt(_dot(_r,_r,mna_dim_size))/norm_b;
+        if (cond < tol)
+            break;
+    }
+
+    free(_r);
+    free(_z);
+    free(_M);
+    free(_p);
+    free(_q);
 }
 
 void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
@@ -811,7 +902,149 @@ void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
 }
 
 void solve_bi_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
-    assert(0 && "implement me!");
+    //assert(0 && "implement me!");
+    printf("debug: exec %s\n",__FUNCTION__);
+    unsigned long _n = analysis->n;
+    unsigned long el_group2_size = analysis->el_group2_size;
+    unsigned long mna_dim_size = _n + el_group2_size;
+
+    //dfloat_t *_r = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    dfloat_t *_r = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
+    if (!_r) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    //dfloat_t *_r_ = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    dfloat_t *_r_ = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
+    if (!_r_) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_z = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_z) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_z_ = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_z_) {        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_M = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_M) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_p = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_p) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_q = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_q) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_p_ = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_p_) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    dfloat_t *_q_ = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
+    if (!_q_) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    cs *_A = analysis->cs_mna_matrix;
+    cs *_A_triplet = analysis->cs_mna_matrix_triplet;
+    dfloat_t *_b = analysis->mna_vector;
+    dfloat_t *_x = analysis->x;
+    //initial values:
+    //                 _x[] = 0,...,0
+    //                 _r = b
+    memset(_x,0,mna_dim_size*sizeof(dfloat_t));
+    memcpy(_r,_b,mna_dim_size*sizeof(dfloat_t));
+    memcpy(_r_,_r,mna_dim_size*sizeof(dfloat_t));
+    //init_M(_M,_A,mna_dim_size);
+    cs_diagonal_values(_A_triplet,_M,mna_dim_size);
+    dfloat_t rho_old = _dot(_r,_r,mna_dim_size);
+    dfloat_t norm_b = sqrt(_dot(_b,_b,mna_dim_size));
+    if (norm_b == 0)
+        norm_b = 1;
+
+    //M^T == M (diagonal)
+
+    int i = 0;
+    const int max_iter = (mna_dim_size > 20) ? mna_dim_size : 20;  //max()
+    for (i=0; i<max_iter; ++i) {
+        _z = init_preconditioner(_M,_z,_r,mna_dim_size);
+        _z_ = init_preconditioner(_M,_z_,_r_,mna_dim_size);
+        dfloat_t rho = _dot(_r_,_z,mna_dim_size);
+#ifdef PRECISION_DOUBLE
+        dfloat_t abs_rho = fabs(rho);
+#else
+        dfloat_t abs_rho = fabsf(rho);
+#endif
+        if (abs_rho < BI_CG_EPSILON) {
+            printf("%s error: algorithm failure (abs(rho) < EPSILON) - exit\n",__FUNCTION__);
+            exit(EXIT_FAILURE);
+        }
+        if (i == 0) {
+            memcpy(_p,_z,mna_dim_size*sizeof(dfloat_t));
+            memcpy(_p_,_z_,mna_dim_size*sizeof(dfloat_t));
+        }
+        else {
+            dfloat_t beta = rho/rho_old;
+            _p = _dot_add(_p,_z,beta,_p,mna_dim_size);
+            _p_ = _dot_add(_p_,_z_,beta,_p_,mna_dim_size);
+        }
+        rho_old = rho;
+        //_q = _mult(_q,_A,_p,mna_dim_size);
+        if (!cs_gaxpy(_A,_p,_q)) {
+			printf("cs_gaxpy() failed - exit.\n");
+			exit(EXIT_FAILURE);
+		}
+        //_q_ = _mult_transposed(_q_,_A,_p_,mna_dim_size);
+        if (!cs_gaxpy_T(_A,_p_,_q_)) {
+			printf("cs_gaxpy_T() failed - exit.\n");
+			exit(EXIT_FAILURE);
+		}
+        dfloat_t omega = _dot(_p_,_q,mna_dim_size);
+#ifdef PRECISION_DOUBLE
+        dfloat_t abs_omega = fabs(rho);
+#else
+        dfloat_t abs_omega = fabsf(rho);
+#endif
+        if (abs_omega < BI_CG_EPSILON) {
+            printf("%s error: algorithm failure (abs(omega) < EPSILON) - exit\n",__FUNCTION__);
+            exit(EXIT_FAILURE);
+        }
+        dfloat_t alpha = rho/omega;
+        _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
+        _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
+        _r_ = _dot_add(_r_,_r_,-alpha,_q_,mna_dim_size);
+        dfloat_t cond = sqrt(_dot(_r,_r,mna_dim_size))/norm_b;
+        if (cond < tol)
+            break;
+    }
+
+    free(_r);
+    free(_z);
+    free(_M);
+    free(_p);
+    free(_q);
+    free(_r_);
+    free(_z_);
+    free(_p_);
+    free(_q_);
 }
 
 static void write_result(FILE *f, struct cmd_print_plot_item *item, struct analysis_info *analysis) {
