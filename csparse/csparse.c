@@ -457,6 +457,40 @@ int cs_gaxpy (const cs *A, const double *x, double *y)
     return (1) ;
 }
 
+int cs_gaxpy_T(const cs *A, const double *x, double *y)
+{
+    int p, j, n, *Ap, *Ai ;
+    double *Ax ;
+    if (!CS_CSC (A) || !x || !y) return (0) ;       /* check inputs */
+    n = A->n ; Ap = A->p ; Ai = A->i ; Ax = A->x ;
+    for (j = 0 ; j < n ; j++)
+    {
+        for (p = Ap [j] ; p < Ap [j+1] ; p++)
+        {
+            y [j] += Ax [p] * x [Ai [p]] ;
+        }
+    }
+    return (1) ;
+}
+
+void cs_diagonal_values(cs *T, double *M, int size)
+{
+	int c = 0;
+
+	if (!CS_TRIPLET (T))
+		return; /* check inputs */
+		
+	for ( c=0; c<size; c++ ) {
+		M[c] = 1;
+	}
+
+	for ( c = 0; c < T->nz; c++ ) {
+		if ( T->i[c] == T->p[c] ) {
+			M[T->i[c]] = T->x[c];
+		}
+	}
+}
+
 double cs_norm (const cs *A)
 {
     int p, j, n, *Ap ;

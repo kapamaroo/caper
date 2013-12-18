@@ -308,6 +308,21 @@ cs *cs_multiply(const cs *A, const cs *B);
  */
 int cs_gaxpy (const cs *A, const double *x, double *y);
 
+/**
+ * Function that implements the following equation: y = A.T*x + y.
+ * @param A Multiplicand matrix.
+ * @param x Multiplier Vector.
+ * @param y Addition vector on input and the solution on output.
+ * @return 1 if successful and 0 in case of error.
+ */
+int cs_gaxpy_T (const cs *A, const double *x, double *y);
+
+/**
+ * Function that extracts the values of the diagonal positions of CS matrix
+ * @param T CS matrix.
+ * @param M matrix with the diagonal values only.
+ */
+void cs_diagonal_values(cs *T, double *M, int size);
 
 /*
  *  1st norm of a matrix.
