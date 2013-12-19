@@ -322,7 +322,7 @@ int cs_gaxpy_T (const cs *A, const double *x, double *y);
  * @param T CS matrix.
  * @param M matrix with the diagonal values only.
  */
-void cs_diagonal_values(cs *T, double *M, int size);
+void cs_diagonal_values(cs *T, double *M);
 
 /*
  *  1st norm of a matrix.

@@ -16,9 +16,9 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
 static int get_sparse(struct command *pool, unsigned long size);
 
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis, const int use_sparse) {
+    printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
     if (use_sparse) {
         analysis_init_sparse(netlist,analysis);
-        printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
         return;
     }
 
@@ -232,12 +232,6 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
-    
-    cs *cs_mna_matrix_triplet = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
-    if (!cs_mna_matrix_triplet) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
 
     dfloat_t *mna_vector = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
     if (!mna_vector) {
@@ -340,7 +334,6 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
     }
 
     assert(cs_mna_matrix->nz == nonzeros);
-    cs_mna_matrix_triplet = cs_mna_matrix;
     cs_mna_matrix = cs_compress(cs_mna_matrix);
     if (!cs_dupl(cs_mna_matrix)) {
         printf("cs_dupl() failed - exit.\n");
@@ -358,7 +351,6 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
     analysis->x = x;
     analysis->mna_vector = mna_vector;
     analysis->cs_mna_matrix = cs_mna_matrix;
-    analysis->cs_mna_matrix_triplet = cs_mna_matrix_triplet;
 }
 
 void decomp_LU(struct analysis_info *analysis) {
@@ -453,6 +445,10 @@ void decomp_LU_sparse(struct analysis_info *analysis) {
         exit(EXIT_FAILURE);
     }
 
+    unsigned long mna_dim_size =
+        analysis->n + analysis->el_group2_size;
+    assert(mna_dim_size == analysis->cs_mna_matrix->n);
+
     analysis->cs_mna_S = S;
     analysis->cs_mna_N = N;
     cs_free(analysis->cs_mna_matrix);
@@ -473,7 +469,9 @@ void solve_LU_sparse(struct analysis_info *analysis) {
     dfloat_t *b = analysis->mna_vector;
     dfloat_t *x = analysis->x;
 
-    if (!cs_ipvec(N->pinv,b,x,mna_dim_size)) {
+    int size = mna_dim_size;
+
+    if (!cs_ipvec(N->pinv,b,x,size)) {
         printf("cs_ipvec() failed - exit.\n");
         exit(EXIT_FAILURE);
     }
@@ -485,7 +483,7 @@ void solve_LU_sparse(struct analysis_info *analysis) {
         printf("cs_usolve() failed - exit.\n");
         exit(EXIT_FAILURE);
     }
-    if (!cs_ipvec(S->q,x,b,mna_dim_size)) {
+    if (!cs_ipvec(S->q,x,b,size)) {
         printf("cs_ipvec() failed - exit.\n");
         exit(EXIT_FAILURE);
     }
@@ -664,6 +662,7 @@ void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
         }
         rho_old = rho;
         _q = _mult(_q,_A,_p,mna_dim_size);
+        print_dfloat_array(mna_dim_size,1,_q);
         dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
         _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
         _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
@@ -718,7 +717,6 @@ void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
     }
 
     cs *_A = analysis->cs_mna_matrix;
-    cs *_A_triplet = analysis->cs_mna_matrix_triplet;
     dfloat_t *_b = analysis->mna_vector;
     dfloat_t *_x = analysis->x;
 
@@ -728,7 +726,7 @@ void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
     memset(_x,0,mna_dim_size*sizeof(dfloat_t));
     memcpy(_r,_b,mna_dim_size*sizeof(dfloat_t));
     //init_M(_M,_A,mna_dim_size);
-    cs_diagonal_values(_A_triplet,_M,mna_dim_size);
+    cs_diagonal_values(_A,_M);
     dfloat_t rho_old = _dot(_r,_r,mna_dim_size);
     dfloat_t norm_b = sqrt(_dot(_b,_b,mna_dim_size));
     if (norm_b == 0)
@@ -747,10 +745,12 @@ void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
         }
         rho_old = rho;
         //_q = _mult(_q,_A,_p,mna_dim_size);
+        memset(_q,0,mna_dim_size*sizeof(dfloat_t));
         if (!cs_gaxpy(_A,_p,_q)) {
-			printf("cs_gaxpy() failed - exit.\n");
-			exit(EXIT_FAILURE);
-		}
+            printf("cs_gaxpy() failed - exit.\n");
+            exit(EXIT_FAILURE);
+        }
+        print_dfloat_array(mna_dim_size,1,_q);
         dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
         _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
         _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
@@ -764,8 +764,8 @@ void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
     free(_M);
     free(_p);
     free(_q);
-}
 
+}
 void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
     printf("debug: exec %s\n",__FUNCTION__);
     unsigned long _n = analysis->n;
@@ -964,7 +964,6 @@ void solve_bi_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
     }
 
     cs *_A = analysis->cs_mna_matrix;
-    cs *_A_triplet = analysis->cs_mna_matrix_triplet;
     dfloat_t *_b = analysis->mna_vector;
     dfloat_t *_x = analysis->x;
     //initial values:
@@ -974,7 +973,7 @@ void solve_bi_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
     memcpy(_r,_b,mna_dim_size*sizeof(dfloat_t));
     memcpy(_r_,_r,mna_dim_size*sizeof(dfloat_t));
     //init_M(_M,_A,mna_dim_size);
-    cs_diagonal_values(_A_triplet,_M,mna_dim_size);
+    cs_diagonal_values(_A,_M);
     dfloat_t rho_old = _dot(_r,_r,mna_dim_size);
     dfloat_t norm_b = sqrt(_dot(_b,_b,mna_dim_size));
     if (norm_b == 0)
@@ -1008,11 +1007,13 @@ void solve_bi_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
         }
         rho_old = rho;
         //_q = _mult(_q,_A,_p,mna_dim_size);
+        memset(_q,0,mna_dim_size*sizeof(dfloat_t));
         if (!cs_gaxpy(_A,_p,_q)) {
 			printf("cs_gaxpy() failed - exit.\n");
 			exit(EXIT_FAILURE);
 		}
         //_q_ = _mult_transposed(_q_,_A,_p_,mna_dim_size);
+        memset(_q_,0,mna_dim_size*sizeof(dfloat_t));
         if (!cs_gaxpy_T(_A,_p_,_q_)) {
 			printf("cs_gaxpy_T() failed - exit.\n");
 			exit(EXIT_FAILURE);

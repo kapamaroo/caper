@@ -30,7 +30,6 @@ struct analysis_info {
     dfloat_t *mna_vector;
 
     //sparse matrix members
-    cs *cs_mna_matrix_triplet;
     cs *cs_mna_matrix;
     csn *cs_mna_N;
     css *cs_mna_S;
