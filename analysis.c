@@ -12,17 +12,26 @@
 
 #define BI_CG_EPSILON 1e-14
 
-void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *analysis);
-static int get_sparse(struct command *pool, unsigned long size);
+enum solver {
+    S_LU = 0,
+    S_SPD,
+    S_ITER,
+    S_SPD_ITER,
+
+    S_LU_SPARSE,
+    S_SPD_SPARSE,
+    S_ITER_SPARSE,
+    S_SPD_ITER_SPARSE
+};
+
 void fprint_dfloat_array(const char *filename,
                          unsigned long row, unsigned long col, dfloat_t *p);
+static unsigned long count_nonzeros(struct netlist_info *netlist);
+static void analyse_init_solver(struct analysis_info *analysis,enum solver _solver);
 
-void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis, const int use_sparse) {
+void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
+                   const int use_sparse, const enum solver _solver) {
     printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
-    if (use_sparse) {
-        analysis_init_sparse(netlist,analysis);
-        return;
-    }
 
     //the last node we care
     //also the number of nodes without considering the ground
@@ -32,13 +41,29 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     unsigned long el_group2_size = netlist->el_group2_size;
 
     unsigned long mna_dim_size = _n + el_group2_size;
-    printf("analysis: trying to allocate %lu bytes ...\n",
-           mna_dim_size * mna_dim_size * sizeof(dfloat_t));
-    dfloat_t *mna_matrix =
-        (dfloat_t*)calloc(mna_dim_size * mna_dim_size,sizeof(dfloat_t));
-    if (!mna_matrix) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
+
+    cs *cs_mna_matrix = NULL;
+    dfloat_t *mna_matrix = NULL;
+    if (use_sparse) {
+        unsigned long nonzeros = count_nonzeros(netlist);
+        //see cs_spalloc()
+        printf("analysis: trying to allocate %lu bytes ...\n",
+               sizeof(cs) + 2*nonzeros * sizeof(int) + nonzeros*sizeof(dfloat_t));
+
+        cs_mna_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
+        if (!cs_mna_matrix) {
+            perror(__FUNCTION__);
+            exit(EXIT_FAILURE);
+        }
+    }
+    else {
+        printf("analysis: trying to allocate %lu bytes ...\n",
+               mna_dim_size * mna_dim_size * sizeof(dfloat_t));
+        mna_matrix = (dfloat_t*)calloc(mna_dim_size*mna_dim_size,sizeof(dfloat_t));
+        if (!mna_matrix) {
+            perror(__FUNCTION__);
+            exit(EXIT_FAILURE);
+        }
     }
 
     dfloat_t *mna_vector = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
@@ -75,69 +100,96 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
 
     //populate MNA Matrix
 
-    //ignore ground node
+    //NOTE: ignore ground node
+    //      all rows are moved up by one
+
     for (i=1; i<=_n; ++i) {
         struct node *_node = &netlist->node_pool[i];
+        unsigned long row  = _node->nuid - 1;
         for (j=0; j<_node->refs; ++j) {
             struct element *el = _node->attached_el[j]._el;
             switch (el->type) {
             case 'r': {
                 assert(_node == el->r->vplus._node || _node == el->r->vminus._node);
-                unsigned long this_node  = (_node == el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
+                unsigned long this_node  = row;
                 unsigned long other_node = (_node != el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
                 dfloat_t value = 1/el->value;
 
-                //NOTE: all rows are moved up by one (we ingore the ground node)
-                if (this_node--) {
-                    mna_matrix[this_node*mna_dim_size + this_node] += value;        //diagonal entry
+                if (use_sparse) {
+                    //diagonal entry
+                    cs_entry(cs_mna_matrix,this_node,this_node,value);
+                    //off diagonal entry
                     if (other_node--)
-                        mna_matrix[this_node*mna_dim_size + other_node] += -value;  //off diagonal entry
+                        cs_entry(cs_mna_matrix,this_node,other_node,-value);
+                }
+                else {
+                    //diagonal entry
+                    mna_matrix[this_node*mna_dim_size + this_node] += value;
+                    //off diagonal entry
+                    if (other_node--)
+                        mna_matrix[this_node*mna_dim_size + other_node] += -value;
                 }
                 break;
             }
             case 'v': {
                 assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
+                dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
 
-                //ignore ground node
-                if (_node->nuid) {
-                    unsigned long row = _node->nuid - 1;
-                    dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
+                unsigned long col = _n + el->idx;
 
+                if (use_sparse) {
                     //group2 element, populate A2
-                    mna_matrix[row*mna_dim_size + _n + el->idx] = value;
-
+                    cs_entry(cs_mna_matrix,row,col,value);
                     //group2 element, populate A2 transposed
-                    mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
+                    cs_entry(cs_mna_matrix,col,row,value);
                 }
-                mna_vector[_n + el->idx] = el->value;
+                else {
+                    //group2 element, populate A2
+                    mna_matrix[row*mna_dim_size + col] = value;
+                    //group2 element, populate A2 transposed
+                    mna_matrix[col*mna_dim_size + row] = value;
+                }
+
+                mna_vector[col] = el->value;
                 break;
             }
             case 'l': {
                 assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
+                dfloat_t value = (_node == el->l->vplus._node) ? +1 : -1;
 
-                //ignore ground node
-                if (_node->nuid) {
-                    unsigned long row = _node->nuid - 1;
-                    dfloat_t value = (_node == el->l->vplus._node) ? +1 : -1;
-                    //dfloat_t value = (_node == el->l->vplus._node) ? el->value : -el->value;
+                unsigned long col = _n + el->idx;
 
+                if (use_sparse) {
                     //group2 element, populate A2
-                    mna_matrix[row*mna_dim_size + _n + el->idx] = value;
-
+                    cs_entry(cs_mna_matrix,row,col,value);
                     //group2 element, populate A2 transposed
-                    mna_matrix[(_n + el->idx)*mna_dim_size + row] = value;
+                    cs_entry(cs_mna_matrix,col,row,value);
+                }
+                else {
+                    //group2 element, populate A2
+                    mna_matrix[row*mna_dim_size + col] = value;
+                    //group2 element, populate A2 transposed
+                    mna_matrix[col*mna_dim_size + row] = value;
                 }
                 break;
             }
             case 'i': {
                 assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
                 //we have -A1*S1, therefore we subtract from the final result
-                mna_vector[_node->nuid - 1] -=
+                mna_vector[row] -=
                     (_node == el->i->vminus._node) ? -el->value : el->value;
                 break;
             }
             default:  break;
             }
+        }
+    }
+
+    if (use_sparse) {
+        cs_mna_matrix = cs_compress(cs_mna_matrix);
+        if (!cs_dupl(cs_mna_matrix)) {
+            printf("cs_dupl() failed - exit.\n");
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -150,8 +202,12 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     analysis->u = u;
 #endif
     analysis->x = x;
-    analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
+
+    analysis->cs_mna_matrix = cs_mna_matrix;
+    analysis->mna_matrix = mna_matrix;
+
+    analyse_init_solver(analysis,_solver);
 }
 
 static unsigned long count_nonzeros(struct netlist_info *netlist) {
@@ -169,41 +225,32 @@ static unsigned long count_nonzeros(struct netlist_info *netlist) {
             switch (el->type) {
             case 'r': {
                 assert(_node == el->r->vplus._node || _node == el->r->vminus._node);
-                unsigned long this_node  = (_node == el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
                 unsigned long other_node = (_node != el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
 
                 //NOTE: all rows are moved up by one (we ingore the ground node)
-                if (this_node--) {
-                    nonzeros++;        //diagonal entry
-                    if (other_node--)
-                        nonzeros++;    //off diagonal entry
-                }
+                nonzeros++;        //diagonal entry
+                if (other_node--)
+                    nonzeros++;    //off diagonal entry
                 break;
             }
             case 'v': {
                 assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
 
-                //ignore ground node
-                if (_node->nuid) {
-                    //group2 element, populate A2
-                    nonzeros++;
+                //group2 element, populate A2
+                nonzeros++;
 
-                    //group2 element, populate A2 transposed
-                    nonzeros++;
-                }
+                //group2 element, populate A2 transposed
+                nonzeros++;
                 break;
             }
             case 'l': {
                 assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
 
-                //ignore ground node
-                if (_node->nuid) {
-                    //group2 element, populate A2
-                    nonzeros++;
+                //group2 element, populate A2
+                nonzeros++;
 
-                    //group2 element, populate A2 transposed
-                    nonzeros++;
-                }
+                //group2 element, populate A2 transposed
+                nonzeros++;
                 break;
             }
             default:  break;
@@ -211,148 +258,6 @@ static unsigned long count_nonzeros(struct netlist_info *netlist) {
         }
     }
     return nonzeros;
-}
-
-void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *analysis) {
-    //the last node we care
-    //also the number of nodes without considering the ground
-    unsigned long _n = netlist->n - 1;
-    unsigned long e = netlist->e;
-    unsigned long el_group1_size = netlist->el_group1_size;
-    unsigned long el_group2_size = netlist->el_group2_size;
-
-    unsigned long mna_dim_size = _n + el_group2_size;
-
-    unsigned long nonzeros = count_nonzeros(netlist);
-
-    //see cs_spalloc()
-    printf("analysis: trying to allocate %lu bytes ...\n",
-           sizeof(cs) + 2*nonzeros * sizeof(int) + nonzeros * sizeof(dfloat_t));
-
-    cs *cs_mna_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
-    if (!cs_mna_matrix) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    dfloat_t *mna_vector = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
-    if (!mna_vector) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    dfloat_t *x = (dfloat_t*)malloc(mna_dim_size*sizeof(dfloat_t));
-    //dfloat_t *x = (dfloat_t*)calloc(mna_dim_size,sizeof(dfloat_t));
-    if (!x) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-#if 0
-    dfloat_t *v = (dfloat_t*)calloc((_n), sizeof(dfloat_t));
-    if (!v) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-
-    dfloat_t *u = (dfloat_t*)calloc(e, sizeof(dfloat_t));
-    if (!u) {
-        perror(__FUNCTION__);
-        exit(EXIT_FAILURE);
-    }
-#endif
-
-    printf("analysis: populating matrices ...\n");
-
-    unsigned long i;
-    unsigned long j;
-
-    //populate MNA Matrix
-
-    //ignore ground node
-    for (i=1; i<=_n; ++i) {
-        struct node *_node = &netlist->node_pool[i];
-        for (j=0; j<_node->refs; ++j) {
-            struct element *el = _node->attached_el[j]._el;
-            switch (el->type) {
-            case 'r': {
-                assert(_node == el->r->vplus._node || _node == el->r->vminus._node);
-                unsigned long this_node  = (_node == el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
-                unsigned long other_node = (_node != el->r->vplus._node) ? el->r->vplus.nuid : el->r->vminus.nuid;
-                dfloat_t value = 1/el->value;
-
-                //NOTE: all rows are moved up by one (we ingore the ground node)
-                if (this_node--) {
-                    cs_entry(cs_mna_matrix,this_node,this_node,value);  //diagonal entry
-                    if (other_node--)
-                        cs_entry(cs_mna_matrix,this_node,other_node,-value);  //off diagonal entry
-                }
-                break;
-            }
-            case 'v': {
-                assert(_node == el->v->vplus._node || _node == el->v->vminus._node);
-
-                //ignore ground node
-                if (_node->nuid) {
-                    unsigned long row = _node->nuid - 1;
-                    dfloat_t value = (_node == el->v->vplus._node) ? +1 : -1;
-
-                    //group2 element, populate A2
-                    cs_entry(cs_mna_matrix,row,_n + el->idx,value);
-
-                    //group2 element, populate A2 transposed
-                    cs_entry(cs_mna_matrix,_n + el->idx,row,value);
-                }
-                mna_vector[_n + el->idx] = el->value;
-                break;
-            }
-            case 'l': {
-                assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
-
-                //ignore ground node
-                if (_node->nuid) {
-                    unsigned long row = _node->nuid - 1;
-                    dfloat_t value = (_node == el->l->vplus._node) ? +1 : -1;
-                    //dfloat_t value = (_node == el->l->vplus._node) ? el->value : -el->value;
-
-                    //group2 element, populate A2
-                    cs_entry(cs_mna_matrix,row,_n + el->idx,value);
-
-                    //group2 element, populate A2 transposed
-                    cs_entry(cs_mna_matrix,_n + el->idx,row,value);
-                }
-                break;
-            }
-            case 'i': {
-                assert(_node == el->i->vplus._node || _node == el->i->vminus._node);
-                //we have -A1*S1, therefore we subtract from the final result
-                mna_vector[_node->nuid - 1] -=
-                    (_node == el->i->vminus._node) ? -el->value : el->value;
-                break;
-            }
-            default:  break;
-            }
-        }
-    }
-
-    assert(cs_mna_matrix->nz == nonzeros);
-    cs_mna_matrix = cs_compress(cs_mna_matrix);
-    if (!cs_dupl(cs_mna_matrix)) {
-        printf("cs_dupl() failed - exit.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    analysis->n = _n;
-    analysis->e = e;
-    analysis->el_group1_size = el_group1_size;
-    analysis->el_group2_size = el_group2_size;
-#if 0
-    analysis->v = v;
-    analysis->u = u;
-#endif
-    analysis->x = x;
-    analysis->mna_vector = mna_vector;
-    analysis->cs_mna_matrix = cs_mna_matrix;
 }
 
 void decomp_LU(struct analysis_info *analysis) {
@@ -1087,18 +992,6 @@ static void write_results(struct netlist_info *netlist, struct analysis_info *an
     }
 }
 
-enum solver {
-    S_LU = 0,
-    S_SPD,
-    S_ITER,
-    S_SPD_ITER,
-
-    S_LU_SPARSE,
-    S_SPD_SPARSE,
-    S_ITER_SPARSE,
-    S_SPD_ITER_SPARSE
-};
-
 static int get_sparse(struct command *pool, unsigned long size) {
     unsigned long i;
     for (i=0; i<size; ++i) {
@@ -1295,6 +1188,28 @@ static void close_logfiles(struct netlist_info *netlist) {
     }
 }
 
+static void analyse_log(struct analysis_info *analysis,const int use_sparse) {
+    printf("debug: writing A and b to files ...\n");
+    unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
+    if (use_sparse)
+        cs_print(analysis->cs_mna_matrix,"mna_sparse_matrix.log",0);
+    else
+        fprint_dfloat_array("mna_dense_matrix.log",
+                            mna_dim_size,mna_dim_size,analysis->mna_matrix);
+    fprint_dfloat_array("mna_b_vector.log",
+                        mna_dim_size,1,analysis->mna_vector);
+}
+
+static struct command *get_dc(struct command *pool, unsigned long size) {
+    unsigned long i;
+    for (i=0; i<size; ++i) {
+        struct command *dc_cmd = &pool[i];
+        if (dc_cmd->type == CMD_DC)
+            return dc_cmd;
+    }
+    return NULL;
+}
+
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     assert(netlist);
     assert(analysis);
@@ -1309,35 +1224,17 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     printf("debug: use_sparse = %d\n",use_sparse);
     printf("\n");
 
-    analysis_init(netlist,analysis,use_sparse);
+    analysis_init(netlist,analysis,use_sparse,_solver);
+    analyse_log(analysis,use_sparse);
 
-#if 1
-    printf("debug: writing A and b to files ...\n");
-    unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
-    if (use_sparse)
-        cs_print(analysis->cs_mna_matrix,"mna_sparse_matrix.log",0);
-    else
-        fprint_dfloat_array("mna_dense_matrix.log",
-                            mna_dim_size,mna_dim_size,analysis->mna_matrix);
-    fprint_dfloat_array("mna_b_vector.log",
-                        mna_dim_size,1,analysis->mna_vector);
-#endif
-
-    struct command *dc_cmd = NULL;
-    unsigned long i;
-    for (i=0; i<netlist->cmd_pool_size; ++i) {
-        if (netlist->cmd_pool[i].type == CMD_DC) {
-            dc_cmd = &netlist->cmd_pool[i];
-            break;
-        }
-    }
-
-    analyse_init_solver(analysis,_solver);
     open_logfiles(netlist);
+
+    struct command *dc_cmd = get_dc(netlist->cmd_pool,netlist->cmd_pool_size);
     if (dc_cmd)
         analyse_dc(&dc_cmd->dc,netlist,analysis,_solver,tol);
     else
         analyse_one_step(netlist,analysis,_solver,tol);
+
     close_logfiles(netlist);
 }
 
