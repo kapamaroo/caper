@@ -19,6 +19,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
     if (use_sparse) {
         analysis_init_sparse(netlist,analysis);
+        cs_print(analysis->cs_mna_matrix,"cs_matrix.log",0);
         return;
     }
 
@@ -662,7 +663,7 @@ void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
         }
         rho_old = rho;
         _q = _mult(_q,_A,_p,mna_dim_size);
-        print_dfloat_array(mna_dim_size,1,_q);
+        //print_dfloat_array(mna_dim_size,1,_q);
         dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
         _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
         _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
@@ -750,7 +751,7 @@ void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
             printf("cs_gaxpy() failed - exit.\n");
             exit(EXIT_FAILURE);
         }
-        print_dfloat_array(mna_dim_size,1,_q);
+        //print_dfloat_array(mna_dim_size,1,_q);
         dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
         _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
         _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
