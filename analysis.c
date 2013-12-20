@@ -289,7 +289,7 @@ void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *an
                 if (this_node--) {
                     cs_entry(cs_mna_matrix,this_node,this_node,value);  //diagonal entry
                     if (other_node--)
-                        cs_entry(cs_mna_matrix,this_node,other_node,value);  //off diagonal entry
+                        cs_entry(cs_mna_matrix,this_node,other_node,-value);  //off diagonal entry
                 }
                 break;
             }
