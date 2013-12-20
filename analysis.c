@@ -10,6 +10,13 @@
 #include <math.h>
 #include "csparse/csparse.h"
 
+#define MSG(msg) do { printf("INFO : %-24s(): %s\n",__FUNCTION__,msg); } while (0);
+#ifdef NDEBUG
+#define DEBUG_MSG(msg)
+#else
+#define DEBUG_MSG(msg) do { printf("DEBUG: %-24s(): %s\n",__FUNCTION__,msg); } while (0);
+#endif
+
 #define BI_CG_EPSILON 1e-14
 
 enum solver {
@@ -32,7 +39,6 @@ static void analyse_init_solver(struct analysis_info *analysis,enum solver _solv
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
                    const int use_sparse, const enum solver _solver) {
     printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
-
     //the last node we care
     //also the number of nodes without considering the ground
     unsigned long _n = netlist->n - 1;
@@ -47,7 +53,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     if (use_sparse) {
         unsigned long nonzeros = count_nonzeros(netlist);
         //see cs_spalloc()
-        printf("analysis: trying to allocate %lu bytes ...\n",
+        printf("debug: trying to allocate %lu bytes ...\n",
                sizeof(cs) + 2*nonzeros * sizeof(int) + nonzeros*sizeof(dfloat_t));
 
         cs_mna_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
@@ -57,7 +63,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
         }
     }
     else {
-        printf("analysis: trying to allocate %lu bytes ...\n",
+        printf("debug: trying to allocate %lu bytes ...\n",
                mna_dim_size * mna_dim_size * sizeof(dfloat_t));
         mna_matrix = (dfloat_t*)calloc(mna_dim_size*mna_dim_size,sizeof(dfloat_t));
         if (!mna_matrix) {
@@ -93,7 +99,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     }
 #endif
 
-    printf("analysis: populating matrices ...\n");
+    MSG("populating matrices ...")
 
     unsigned long i;
     unsigned long j;
@@ -186,7 +192,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     }
 
     if (use_sparse) {
+        MSG("compress matrix ...")
         cs_mna_matrix = cs_compress(cs_mna_matrix);
+        MSG("deduplicate entries ...")
         if (!cs_dupl(cs_mna_matrix)) {
             printf("cs_dupl() failed - exit.\n");
             exit(EXIT_FAILURE);
@@ -261,7 +269,7 @@ static unsigned long count_nonzeros(struct netlist_info *netlist) {
 }
 
 void decomp_LU(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
@@ -278,7 +286,7 @@ void decomp_LU(struct analysis_info *analysis) {
 }
 
 void solve_LU(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
@@ -301,7 +309,7 @@ void solve_LU(struct analysis_info *analysis) {
 }
 
 void decomp_cholesky(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
@@ -315,7 +323,7 @@ void decomp_cholesky(struct analysis_info *analysis) {
 }
 
 void solve_cholesky(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
@@ -337,7 +345,7 @@ void solve_cholesky(struct analysis_info *analysis) {
 }
 
 void decomp_LU_sparse(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
 
     //sparse magic
     css *S = cs_sqr(2,analysis->cs_mna_matrix,0);
@@ -352,9 +360,7 @@ void decomp_LU_sparse(struct analysis_info *analysis) {
         exit(EXIT_FAILURE);
     }
 
-    unsigned long mna_dim_size =
-        analysis->n + analysis->el_group2_size;
-    assert(mna_dim_size == analysis->cs_mna_matrix->n);
+    assert(analysis->n + analysis->el_group2_size == analysis->cs_mna_matrix->n);
 
     analysis->cs_mna_S = S;
     analysis->cs_mna_N = N;
@@ -363,7 +369,7 @@ void decomp_LU_sparse(struct analysis_info *analysis) {
 }
 
 void solve_LU_sparse(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
@@ -397,7 +403,7 @@ void solve_LU_sparse(struct analysis_info *analysis) {
 }
 
 void decomp_cholesky_sparse(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
 
     //sparse magic
     css *S = cs_schol(1,analysis->cs_mna_matrix);
@@ -419,7 +425,7 @@ void decomp_cholesky_sparse(struct analysis_info *analysis) {
 }
 
 void solve_cholesky_sparse(struct analysis_info *analysis) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
@@ -505,7 +511,7 @@ static inline void init_M(dfloat_t *M, dfloat_t *A, unsigned long size) {
 }
 
 void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long _n = analysis->n;
     unsigned long el_group2_size = analysis->el_group2_size;
     unsigned long mna_dim_size = _n + el_group2_size;
@@ -569,7 +575,6 @@ void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
         }
         rho_old = rho;
         _q = _mult(_q,_A,_p,mna_dim_size);
-        //print_dfloat_array(mna_dim_size,1,_q);
         dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
         _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
         _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
@@ -586,8 +591,7 @@ void solve_cg(struct analysis_info *analysis, dfloat_t tol) {
 }
 
 void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
-    //assert(0 && "implement me!");
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long _n = analysis->n;
     unsigned long el_group2_size = analysis->el_group2_size;
     unsigned long mna_dim_size = _n + el_group2_size;
@@ -657,7 +661,6 @@ void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
             printf("cs_gaxpy() failed - exit.\n");
             exit(EXIT_FAILURE);
         }
-        //print_dfloat_array(mna_dim_size,1,_q);
         dfloat_t alpha = rho/_dot(_p,_q,mna_dim_size);
         _x = _dot_add(_x,_x,alpha,_p,mna_dim_size);
         _r = _dot_add(_r,_r,-alpha,_q,mna_dim_size);
@@ -674,7 +677,7 @@ void solve_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
 
 }
 void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long _n = analysis->n;
     unsigned long el_group2_size = analysis->el_group2_size;
     unsigned long mna_dim_size = _n + el_group2_size;
@@ -809,8 +812,7 @@ void solve_bi_cg(struct analysis_info *analysis, dfloat_t tol) {
 }
 
 void solve_bi_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
-    //assert(0 && "implement me!");
-    printf("debug: exec %s\n",__FUNCTION__);
+    DEBUG_MSG("")
     unsigned long _n = analysis->n;
     unsigned long el_group2_size = analysis->el_group2_size;
     unsigned long mna_dim_size = _n + el_group2_size;
@@ -981,6 +983,7 @@ static void write_result(FILE *f, struct cmd_print_plot_item *item, struct analy
 }
 
 static void write_results(struct netlist_info *netlist, struct analysis_info *analysis) {
+    DEBUG_MSG("")
     unsigned long i;
     unsigned long j;
     for (i=0; i<netlist->cmd_pool_size; ++i) {
@@ -1050,6 +1053,7 @@ static dfloat_t get_tolerance(struct command *pool, unsigned long size) {
 
 static void analyse_init_solver(struct analysis_info *analysis,
                                 enum solver _solver) {
+    DEBUG_MSG("")
     switch (_solver) {
     case S_SPD:       decomp_cholesky(analysis);  break;
     case S_ITER:                                  break;
@@ -1086,6 +1090,7 @@ static void analyse_dc_init(struct cmd_dc *dc,
                             struct netlist_info *netlist,
                             struct analysis_info *analysis,
                             enum solver _solver, dfloat_t tol) {
+    DEBUG_MSG("")
     unsigned long _n = analysis->n;
 
     //init mna_vector
@@ -1143,6 +1148,7 @@ static void analyse_dc(struct cmd_dc *dc,
                        struct netlist_info *netlist,
                        struct analysis_info *analysis,
                        enum solver _solver, dfloat_t tol) {
+    DEBUG_MSG("")
     analyse_dc_init(dc,netlist,analysis,_solver,tol);
     unsigned long i;
     unsigned long repeat = (dc->end - dc->begin)/dc->step;
@@ -1153,6 +1159,7 @@ static void analyse_dc(struct cmd_dc *dc,
 }
 
 static void open_logfiles(struct netlist_info *netlist) {
+    DEBUG_MSG("")
     unsigned long i;
     for (i=0; i<netlist->cmd_pool_size; ++i) {
         struct command *cmd = &netlist->cmd_pool[i];
@@ -1168,6 +1175,7 @@ static void open_logfiles(struct netlist_info *netlist) {
 }
 
 static void close_logfiles(struct netlist_info *netlist) {
+    DEBUG_MSG("")
     unsigned long i;
     for (i=0; i<netlist->cmd_pool_size; ++i) {
         struct command *cmd = &netlist->cmd_pool[i];
@@ -1189,7 +1197,7 @@ static void close_logfiles(struct netlist_info *netlist) {
 }
 
 static void analyse_log(struct analysis_info *analysis,const int use_sparse) {
-    printf("debug: writing A and b to files ...\n");
+    MSG("writing A and b to files ...")
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     if (use_sparse)
         cs_print(analysis->cs_mna_matrix,"mna_sparse_matrix.log",0);

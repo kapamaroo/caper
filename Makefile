@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-Wall -g -lgsl -lgslcblas -lm
-#CFLAGS=-Wall -O3 -march=native -lm
+CFLAGS=-Wall -lgsl -lgslcblas -lm -g -UNDEBUG
+#CFLAGS=-Wall -lgsl -lgslcblas -lm -O3 -march=native -DNDEBUG
 DEPS = parser.h datatypes.h analysis.h hash.h
 OBJ = main.o parser.o analysis.o hash.o csparse/csparse.o
 
