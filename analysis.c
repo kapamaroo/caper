@@ -14,6 +14,8 @@
 
 void analysis_init_sparse(struct netlist_info *netlist, struct analysis_info *analysis);
 static int get_sparse(struct command *pool, unsigned long size);
+void fprint_dfloat_array(const char *filename,
+                         unsigned long row, unsigned long col, dfloat_t *p);
 
 void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis, const int use_sparse) {
     printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
@@ -151,6 +153,9 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     analysis->x = x;
     analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
+
+    fprint_dfloat_array("dense_matrix.log",
+                        mna_dim_size,mna_dim_size,mna_matrix);
 }
 
 static unsigned long count_nonzeros(struct netlist_info *netlist) {
@@ -1326,6 +1331,43 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     else
         analyse_one_step(netlist,analysis,_solver,tol);
     close_logfiles(netlist);
+}
+
+void fprint_dfloat_array(const char *filename,
+                         unsigned long row, unsigned long col, dfloat_t *p) {
+    FILE *file = fopen(filename,"w");
+    if (!file) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    unsigned long i;
+    unsigned long j;
+
+    fprintf(file,"==============================================\n");
+    fprintf(file,"      ");
+    for (j=0; j<col; ++j) {
+        fprintf(file,"%9lu|",j);
+    }
+    fprintf(file,"\n     ___________________________________________\n");
+
+    for (i=0; i<row; ++i) {
+        fprintf(file,"%3lu | ",i + 1);
+        for (j=0; j<col; ++j) {
+            dfloat_t val = p[i*col + j];
+            fprintf(file,"%+.2e ",val);
+        }
+        fprintf(file,"\n");
+    }
+
+    if (fflush(file) == EOF) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+    if (fclose(file) == EOF) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
 }
 
 void print_dfloat_array(unsigned long row, unsigned long col, dfloat_t *p) {
