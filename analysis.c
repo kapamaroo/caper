@@ -21,7 +21,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
     if (use_sparse) {
         analysis_init_sparse(netlist,analysis);
-        cs_print(analysis->cs_mna_matrix,"cs_matrix.log",0);
         return;
     }
 
@@ -153,9 +152,6 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     analysis->x = x;
     analysis->mna_matrix = mna_matrix;
     analysis->mna_vector = mna_vector;
-
-    fprint_dfloat_array("dense_matrix.log",
-                        mna_dim_size,mna_dim_size,mna_matrix);
 }
 
 static unsigned long count_nonzeros(struct netlist_info *netlist) {
@@ -1314,6 +1310,18 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     printf("\n");
 
     analysis_init(netlist,analysis,use_sparse);
+
+#if 1
+    printf("debug: writing A and b to files ...\n");
+    unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
+    if (use_sparse)
+        cs_print(analysis->cs_mna_matrix,"mna_sparse_matrix.log",0);
+    else
+        fprint_dfloat_array("mna_dense_matrix.log",
+                            mna_dim_size,mna_dim_size,analysis->mna_matrix);
+    fprint_dfloat_array("mna_b_vector.log",
+                        mna_dim_size,1,analysis->mna_vector);
+#endif
 
     struct command *dc_cmd = NULL;
     unsigned long i;
