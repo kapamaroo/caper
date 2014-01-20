@@ -928,9 +928,95 @@ void parse_element(char **buf) {
     }
 }
 
+//these must be in the same order as in the enum transient_type in datatypes.h
+static const char *str_trans_pool[] = { "exp", "sin", "pulse", "pwl" };
+
+static inline enum transient_type get_transient_type(const char *s) {
+    assert(s);
+    int i;
+    const int size = sizeof(str_trans_pool)/sizeof(*str_trans_pool);
+    for (i=0; i<size; ++i)
+        if (strcmp(s,str_trans_pool[i]) == 0)
+            return (enum transient_type)i;
+    printf("Unknown transient type analysis '%s' - exit\n",s);
+    exit(EXIT_FAILURE);
+}
+
 struct _transient_ *parse_transient(char **buf) {
-    //implement me
-    return NULL;
+    char *end = current_input->raw_end;
+    if (!(*buf) || **buf == '\r' || **buf == '\n')
+        //no transient, new line found
+        return NULL;
+
+    //yes transient :)
+    struct _transient_ *trans = (struct _transient_ *)calloc(1,sizeof(struct _transient_));
+    if (!trans) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+    char *str_trans = parse_string(buf,"transient type");
+    trans->type = get_transient_type(str_trans);
+    free(str_trans);
+
+#warning TODO:  set the callers
+    switch (trans->type) {
+    case TR_EXP:
+        trans->exp.call = NULL;
+        trans->exp.i1 = parse_value(buf,NULL,"exp.i1");
+        trans->exp.i2 = parse_value(buf,NULL,"exp.i2");
+        trans->exp.td1 = parse_value(buf,NULL,"exp.td1");
+        trans->exp.tc1 = parse_value(buf,NULL,"exp.tc1");
+        trans->exp.td2 = parse_value(buf,NULL,"exp.td2");
+        trans->exp.tc2 = parse_value(buf,NULL,"exp.tc2");
+        break;
+    case TR_SIN:
+        trans->sin.call = NULL;
+        trans->sin.i1 = parse_value(buf,NULL,"sin.i1");
+        trans->sin.ia = parse_value(buf,NULL,"sin.ia");
+        trans->sin.fr = parse_value(buf,NULL,"sin.fr");
+        trans->sin.td = parse_value(buf,NULL,"sin.td");
+        trans->sin.df = parse_value(buf,NULL,"sin.df");
+        trans->sin.ph = parse_value(buf,NULL,"sin.ph");
+        break;
+    case TR_PULSE:
+        trans->pulse.call = NULL;
+        trans->pulse.i1 = parse_value(buf,NULL,"pulse.i1");
+        trans->pulse.i2 = parse_value(buf,NULL,"pulse.i2");
+        trans->pulse.td = parse_value(buf,NULL,"pulse.td");
+        trans->pulse.tr = parse_value(buf,NULL,"pulse.tr");
+        trans->pulse.tf = parse_value(buf,NULL,"pulse.tf");
+        trans->pulse.pw = parse_value(buf,NULL,"pulse.pw");
+        trans->pulse.per = parse_value(buf,NULL,"pulse.per");
+        trans->pulse.k = 0;
+        break;
+    case TR_PWL: {
+        const int default_pair_size = 8;
+
+        trans->pwl.call = NULL;
+        trans->pwl.size = default_pair_size;
+        trans->pwl.next = 0;
+        trans->pwl.pair = (struct transient_pwl_pair *)calloc(default_pair_size,
+                                                              sizeof(struct transient_pwl_pair));
+        if (!trans->pwl.pair) {
+            perror(__FUNCTION__);
+            exit(EXIT_FAILURE);
+        }
+
+        while (*buf && **buf != '\r' && **buf != '\n') {
+            parse_char(buf,"(","'(' lparen");
+            trans->pwl.pair[trans->pwl.next].time = parse_value(buf,NULL,"pwl pair (time field)");
+            trans->pwl.pair[trans->pwl.next].value = parse_value(buf,NULL,"pwl pair (value field)");
+            trans->pwl.next++;
+            grow((void **)&trans->pwl.pair,trans->pwl.size,
+                 sizeof(struct transient_pwl_pair),trans->pwl.next,
+                 NO_REBUILD);
+            parse_char(buf,")","')' rparen");
+        }
+        break;
+    }
+    }
+
+    return trans;
 }
 
 void parse_comment(char **buf) {
