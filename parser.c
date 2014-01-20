@@ -944,7 +944,6 @@ static inline enum transient_type get_transient_type(const char *s) {
 }
 
 struct _transient_ *parse_transient(char **buf) {
-    char *end = current_input->raw_end;
     if (!(*buf) || **buf == '\r' || **buf == '\n')
         //no transient, new line found
         return NULL;
