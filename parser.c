@@ -22,6 +22,7 @@ void parse_line(char **buf);
 void parse_element(char **buf);
 void parse_comment(char **buf);
 void parse_command(char **buf);
+struct _transient_ *parse_transient(char **buf);
 
 char *parse_string(char **buf, char *info);
 
@@ -881,6 +882,7 @@ void parse_element(char **buf) {
         s_el->_vi->vplus = parse_node(buf,s_el,CONN_VPLUS);
         s_el->_vi->vminus = parse_node(buf,s_el,CONN_VMINUS);
         s_el->value = parse_value(buf,NULL,"voltage/current value");
+        s_el->_vi->transient = parse_transient(buf);
         break;
     }
     case 'r':
@@ -924,6 +926,11 @@ void parse_element(char **buf) {
         printf("Unknown element type '%c' - exit.\n",type);
         exit(EXIT_FAILURE);
     }
+}
+
+struct _transient_ *parse_transient(char **buf) {
+    //implement me
+    return NULL;
 }
 
 void parse_comment(char **buf) {

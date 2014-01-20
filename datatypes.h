@@ -112,9 +112,75 @@ struct _passive_ {
     struct container_node vminus;
 };
 
+enum transient_type {
+    TR_EXP =0,
+    TR_SIN,
+    TR_PULSE,
+    TR_PWL
+};
+
+struct transient_exp {
+    dfloat_t i1;
+    dfloat_t i2;
+    dfloat_t td1;  // int ??
+    dfloat_t tc1;
+    dfloat_t td2;  // int ??
+    dfloat_t tc2;
+};
+
+struct transient_sin {
+    dfloat_t i1;
+    dfloat_t ia;
+    dfloat_t fr;  // int ??
+    dfloat_t td;  // int ??
+    dfloat_t df;  // int ??
+    dfloat_t ph;  // int ??
+};
+
+struct transient_pulse {
+    dfloat_t i1;
+    dfloat_t i2;
+    dfloat_t td;  // int ??
+    dfloat_t tr;
+    dfloat_t tf;
+    dfloat_t pw;
+    dfloat_t per;  // int ??
+    unsigned long k;  // internal helper
+};
+
+struct transient_pwl_pair {
+    dfloat_t time;
+    dfloat_t value;
+};
+
+struct transient_pwl {
+    struct transient_pwl_pair *pair;
+    unsigned long size;
+    unsigned long next;
+};
+
+struct _transient_ {
+    enum transient_type type;
+    union _data_ {
+        struct transient_exp exp;
+        struct transient_sin sin;
+        struct transient_pulse pulse;
+        struct transient_pwl pwl;
+        void *raw_ptr;
+    } data;
+    union _call_ {
+        dfloat_t (*exp)(struct transient_exp *data);
+        dfloat_t (*sin)(struct transient_sin *data);
+        dfloat_t (*pulse)(struct transient_pulse *data);
+        dfloat_t (*pwl)(struct transient_pwl *data);
+        void *raw_ptr;
+    } call;
+};
+
 struct _source_ {
     struct container_node vplus;
     struct container_node vminus;
+    struct _transient_ *transient;
 };
 
 enum nonlinear_model_type {
