@@ -157,7 +157,7 @@ struct transient_pwl_pair {
 };
 
 struct transient_pwl {
-    dfloat_t (*pwl)(struct transient_pwl *data);
+    dfloat_t (*call)(struct transient_pwl *data);
     struct transient_pwl_pair *pair;
     unsigned long size;
     unsigned long next;
