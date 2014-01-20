@@ -2,14 +2,7 @@
 #define __DATATYPES_H__
 
 #include <stdio.h>
-
-#define PRECISION_DOUBLE
-
-#ifdef PRECISION_DOUBLE
-typedef double dfloat_t;
-#else
-typedef float dfloat_t;
-#endif
+#include "precision.h"
 
 enum connection_type {
     CONN_VPLUS = 0,

@@ -14,6 +14,7 @@
 
 #include "parser.h"
 #include "hash.h"
+#include "transient_support.h"
 
 #define SHOULD_REBUILD 1
 #define NO_REBUILD 0
@@ -958,10 +959,9 @@ struct _transient_ *parse_transient(char **buf) {
     trans->type = get_transient_type(str_trans);
     free(str_trans);
 
-#warning TODO:  set the callers
     switch (trans->type) {
     case TR_EXP:
-        trans->exp.call = NULL;
+        trans->exp.call = analysis_transient_call_exp;
         trans->exp.i1 = parse_value(buf,NULL,"exp.i1");
         trans->exp.i2 = parse_value(buf,NULL,"exp.i2");
         trans->exp.td1 = parse_value(buf,NULL,"exp.td1");
@@ -970,7 +970,7 @@ struct _transient_ *parse_transient(char **buf) {
         trans->exp.tc2 = parse_value(buf,NULL,"exp.tc2");
         break;
     case TR_SIN:
-        trans->sin.call = NULL;
+        trans->sin.call = analysis_transient_call_sin;
         trans->sin.i1 = parse_value(buf,NULL,"sin.i1");
         trans->sin.ia = parse_value(buf,NULL,"sin.ia");
         trans->sin.fr = parse_value(buf,NULL,"sin.fr");
@@ -979,7 +979,7 @@ struct _transient_ *parse_transient(char **buf) {
         trans->sin.ph = parse_value(buf,NULL,"sin.ph");
         break;
     case TR_PULSE:
-        trans->pulse.call = NULL;
+        trans->pulse.call = analysis_transient_call_pulse;
         trans->pulse.i1 = parse_value(buf,NULL,"pulse.i1");
         trans->pulse.i2 = parse_value(buf,NULL,"pulse.i2");
         trans->pulse.td = parse_value(buf,NULL,"pulse.td");
@@ -992,7 +992,7 @@ struct _transient_ *parse_transient(char **buf) {
     case TR_PWL: {
         const int default_pair_size = 8;
 
-        trans->pwl.call = NULL;
+        trans->pwl.call = analysis_transient_call_pwl;
         trans->pwl.size = default_pair_size;
         trans->pwl.next = 0;
         trans->pwl.pair = (struct transient_pwl_pair *)calloc(default_pair_size,
