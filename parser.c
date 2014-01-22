@@ -1193,54 +1193,12 @@ void parse_command(char **buf) {
 
     switch (type) {
     case CMD_OPTION: {
-#if 1
         do {
             enum cmd_option_type type = parse_option(buf);
             new_cmd.option[type] = 1;
             if (new_cmd.option[CMD_OPT_BAD_OPTION])
                 return;
         } while (*buf && !isdelimiter(**buf));
-#else
-        char *opt = parse_string(buf,".option argument");
-        enum cmd_option_type opt_type = get_cmd_opt_type(opt);
-        switch (opt_type) {
-        case CMD_OPT_BAD_OPTION:
-            printf("***  WARNING  ***    Unknown .option argument '%s' - error\n",opt);
-            free(opt);
-            return;
-        case CMD_OPT_SPD: {
-            new_cmd.option_type = opt_type;
-            parse_eat_whitechars(buf);
-            if (*buf && !isdelimiter(**buf)) {
-                char *backup_pos = *buf;
-                char *iter = parse_string(buf,"expected \"iter\"");
-                if (strcmp(iter,"iter")!=0) {
-                    (*buf) = backup_pos;
-                    free(iter);
-                    return;
-                }
-                free(iter);
-                new_cmd.option_type = CMD_OPT_SPD_ITER;
-                new_cmd.value = DEFAULT_TOL;
-            }
-            break;
-        }
-        case CMD_OPT_SPD_ITER:
-            assert(0 && "should be handled above");
-            break;
-        case CMD_OPT_ITER:
-            new_cmd.option_type = opt_type;
-            new_cmd.value = DEFAULT_TOL;
-            break;
-        case CMD_OPT_ITOL: {
-            new_cmd.option_type = opt_type;
-            parse_eat_whitechars(buf);
-            dfloat_t value = parse_value(buf,NULL,"tolerance value");
-            new_cmd.value = value;
-            break;
-        }
-        }
-#endif
         break;
     }
     case CMD_DC: {
