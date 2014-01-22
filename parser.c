@@ -1047,7 +1047,7 @@ void parse_comment(char **buf) {
 static const char *cmd_base[] = { "option", "dc", "plot", "print", "tran" };
 
 //these must be in the same order as in the enum cmd_opt_type in datatypes.h
-static const char *cmd_opt_base[] = { "spd", "iter", "itol", "sparse", "method=tr", "method=be" };
+static const char *cmd_opt_base[] = { "spd", "iter", "itol", "sparse", "tr", "be" };
 
 static inline enum cmd_type get_cmd_type(char *cmd) {
     assert(cmd);
@@ -1151,6 +1151,18 @@ static enum cmd_option_type parse_option(char **buf) {
     parse_eat_whitechars(buf);
     char *backup_pos = *buf;
     char *option = parse_string(buf,"option");
+
+    if (!strcmp(option,"method=")) {
+        free(option);
+        option = parse_string(buf,"transient method");
+    }
+    else if (!strcmp(option,"method")) {
+        parse_char(buf,"=","'=' asignment");
+        parse_eat_whitechars(buf);
+        free(option);
+        option = parse_string(buf,"transient method");
+    }
+
     enum cmd_option_type type = get_cmd_opt_type(option);
     if (type == CMD_OPT_BAD_OPTION) {
         printf("***  WARNING  ***    Unknown .option argument '%s' - error\n",option);
