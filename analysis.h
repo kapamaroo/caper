@@ -29,6 +29,8 @@ struct analysis_info {
     dfloat_t *mna_matrix;
     dfloat_t *mna_vector;
 
+    dfloat_t *transient_matrix;
+
     //sparse matrix members
     cs *cs_mna_matrix;
     csn *cs_mna_N;
