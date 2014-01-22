@@ -867,6 +867,24 @@ dfloat_t parse_value_optional(char **buf, char *prefix, dfloat_t default_value) 
         return parse_value(buf,prefix,"value");
 }
 
+static dfloat_t get_init_transient_value(struct _source_ *s) {
+    assert(s);
+    assert(s->transient);
+
+    switch (s->transient->type) {
+    case TR_EXP:
+        return s->transient.exp.i1;
+    case TR_SIN:
+        return s->transient.sin.i1;
+    case TR_PULSE:
+        return s->transient.pulse.i1;
+    case TR_PWL:
+        if (s->transient.pwl.next && s->transient.pwl.pair[0].time)
+            return s->transient.pwl.pair[0].value;
+        return s->value;
+    }
+}
+
 void parse_element(char **buf) {
     //printf("in function: %s\n",__FUNCTION__);
 
@@ -882,6 +900,14 @@ void parse_element(char **buf) {
         s_el->_vi->vminus = parse_node(buf,s_el,CONN_VMINUS);
         s_el->value = parse_value(buf,NULL,"voltage/current value");
         s_el->_vi->transient = parse_transient(buf);
+        dfloat_t initial_transient_value = get_init_transient_value(s_el);
+        if (s_el->value != initial_transient_value) {
+            dfloat_t init_value = get_init_transient_value(s_el->_vi->transient);
+            printf("***  WARNING  ***    transient analysis may produce inaccurate results\n");
+            printf("                     in source '%s':\n",s_el->name);
+            printf("                     reason: (dc value) %lf != %f (initial transient value)\n",
+                   s_el->value,initial_transient_value);
+        }
         break;
     }
     case 'r':
