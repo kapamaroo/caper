@@ -958,6 +958,7 @@ struct _transient_ *parse_transient(char **buf) {
 
     switch (trans->type) {
     case TR_EXP:
+        parse_char(buf,"(","'(' lparen");
         trans->exp.call = analysis_transient_call_exp;
         trans->exp.i1 = parse_value(buf,NULL,"exp.i1");
         trans->exp.i2 = parse_value(buf,NULL,"exp.i2");
@@ -965,8 +966,10 @@ struct _transient_ *parse_transient(char **buf) {
         trans->exp.tc1 = parse_value(buf,NULL,"exp.tc1");
         trans->exp.td2 = parse_value(buf,NULL,"exp.td2");
         trans->exp.tc2 = parse_value(buf,NULL,"exp.tc2");
+        parse_char(buf,")","')' rparen");
         break;
     case TR_SIN:
+        parse_char(buf,"(","'(' lparen");
         trans->sin.call = analysis_transient_call_sin;
         trans->sin.i1 = parse_value(buf,NULL,"sin.i1");
         trans->sin.ia = parse_value(buf,NULL,"sin.ia");
@@ -974,8 +977,10 @@ struct _transient_ *parse_transient(char **buf) {
         trans->sin.td = parse_value(buf,NULL,"sin.td");
         trans->sin.df = parse_value(buf,NULL,"sin.df");
         trans->sin.ph = parse_value(buf,NULL,"sin.ph");
+        parse_char(buf,")","')' rparen");
         break;
     case TR_PULSE:
+        parse_char(buf,"(","'(' lparen");
         trans->pulse.call = analysis_transient_call_pulse;
         trans->pulse.i1 = parse_value(buf,NULL,"pulse.i1");
         trans->pulse.i2 = parse_value(buf,NULL,"pulse.i2");
@@ -984,6 +989,7 @@ struct _transient_ *parse_transient(char **buf) {
         trans->pulse.tf = parse_value(buf,NULL,"pulse.tf");
         trans->pulse.pw = parse_value(buf,NULL,"pulse.pw");
         trans->pulse.per = parse_value(buf,NULL,"pulse.per");
+        parse_char(buf,")","')' rparen");
         trans->pulse.k = 0;
         break;
     case TR_PWL: {
@@ -1030,12 +1036,15 @@ void parse_comment(char **buf) {
 }
 
 //these must be in the same order as in the enum cmd_type in datatypes.h
-static const char *cmd_base[] = { "option", "dc", "plot", "print" };
+static const char *cmd_base[] = { "option", "dc", "plot", "print", "tran" };
 
 //these must be in the same order as in the enum cmd_opt_type in datatypes.h
-static const char *cmd_opt_base[] = { "spd", "iter", "itol", "sparse" };
+static const char *cmd_opt_base[] = { "spd", "iter", "itol", "sparse", "method=tr", "method=be" };
 
 static inline enum cmd_type get_cmd_type(char *cmd) {
+    assert(cmd);
+    assert(sizeof(cmd_base)/sizeof(char *) == CMD_BAD_COMMAND
+           && "unbalanced cmd_base and enum cmd_type");
     int i;
     for (i=0; i<CMD_SIZE; ++i)
         if (strcmp(cmd, cmd_base[i]) == 0)
@@ -1302,6 +1311,10 @@ void parse_command(char **buf) {
                 create_log_filename("print",counter_cmd_print++);
         break;
     }
+    case CMD_TRAN:
+        new_cmd.transient.time_step = parse_value(buf,NULL,"transsient time_step");
+        new_cmd.transient.fin_time = parse_value(buf,NULL,"transsient fin_time");
+        break;
     default:  assert(0);
     }
 

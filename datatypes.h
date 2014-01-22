@@ -21,6 +21,7 @@ enum cmd_type {
     CMD_DC,
     CMD_PLOT,
     CMD_PRINT,
+    CMD_TRAN,
     CMD_BAD_COMMAND  //must be last
 };
 
@@ -29,6 +30,8 @@ enum cmd_option_type {
     CMD_OPT_ITER,
     CMD_OPT_ITOL,
     CMD_OPT_SPARSE,
+    CMD_OPT_METHOD_TR,
+    CMD_OPT_METHOD_BE,
     CMD_OPT_BAD_OPTION  //must be last
 };
 
@@ -81,6 +84,11 @@ struct cmd_dc {
     dfloat_t step;
 };
 
+struct cmd_tran {
+    dfloat_t time_step;
+    dfloat_t fin_time;
+};
+
 struct command {
     enum cmd_type type;
     dfloat_t value;
@@ -88,6 +96,7 @@ struct command {
         int option[CMD_OPT_BAD_OPTION + 1];
         struct cmd_dc dc;
         struct cmd_print_plot print_plot;
+        struct cmd_tran transient;
     };
 };
 
