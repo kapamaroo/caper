@@ -814,10 +814,11 @@ dfloat_t parse_value(char **buf, char *prefix, char *info) {
     errno = 0;
 
     dfloat_t value;
+    int offset = 0;
 #ifdef PRECISION_DOUBLE
-    int status = sscanf(*buf,"%lf",&value);
+    int status = sscanf(*buf,"%lf%n",&value,&offset);
 #else
-    int status = sscanf(*buf,"%f",&value);
+    int status = sscanf(*buf,"%f%n",&value,&offset);
 #endif
     if (errno) {
         perror(__FUNCTION__);
@@ -828,19 +829,16 @@ dfloat_t parse_value(char **buf, char *prefix, char *info) {
         exit(EXIT_FAILURE);
     }
     if (status == 0) {
-        printf("error: sscanf() bad input\n");
+        printf("error: sscanf() bad input '%10s'\n",*buf);
         exit(EXIT_FAILURE);
     }
 
-    while (*buf != end) {
-        if (isspace(**buf))
-            break;
-        (*buf)++;
-    }
+    assert(offset);
+    *buf += offset;
 
     if (*buf == end)
         *buf = NULL;
-    if (*buf && !isspace(**buf)) {
+    if (*buf && !isdelimiter(**buf)) {
         printf("error:%lu: invalid character '%c' after value %lf - exit.\n",
                line_num,**buf,value);
         exit(EXIT_FAILURE);
