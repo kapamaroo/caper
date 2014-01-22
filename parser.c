@@ -771,6 +771,8 @@ char parse_char(char **buf, char *patterns, char *info) {
 
     char c = tolower(**buf);
     (*buf)++;
+    if (*buf == end)
+        *buf = NULL;
 
     char *p = patterns;
     while (*p != '\0' && c != tolower(*p))
@@ -781,8 +783,6 @@ char parse_char(char **buf, char *patterns, char *info) {
                line_num,info,patterns,c,c);
         exit(EXIT_FAILURE);
     }
-
-    parse_eat_whitechars(buf);
 
     return c;
 }
@@ -959,6 +959,7 @@ struct _transient_ *parse_transient(char **buf) {
     switch (trans->type) {
     case TR_EXP:
         parse_char(buf,"(","'(' lparen");
+        parse_eat_whitechars(buf);
         trans->exp.call = analysis_transient_call_exp;
         trans->exp.i1 = parse_value(buf,NULL,"exp.i1");
         trans->exp.i2 = parse_value(buf,NULL,"exp.i2");
@@ -967,9 +968,11 @@ struct _transient_ *parse_transient(char **buf) {
         trans->exp.td2 = parse_value(buf,NULL,"exp.td2");
         trans->exp.tc2 = parse_value(buf,NULL,"exp.tc2");
         parse_char(buf,")","')' rparen");
+        parse_eat_whitechars(buf);
         break;
     case TR_SIN:
         parse_char(buf,"(","'(' lparen");
+        parse_eat_whitechars(buf);
         trans->sin.call = analysis_transient_call_sin;
         trans->sin.i1 = parse_value(buf,NULL,"sin.i1");
         trans->sin.ia = parse_value(buf,NULL,"sin.ia");
@@ -978,9 +981,11 @@ struct _transient_ *parse_transient(char **buf) {
         trans->sin.df = parse_value(buf,NULL,"sin.df");
         trans->sin.ph = parse_value(buf,NULL,"sin.ph");
         parse_char(buf,")","')' rparen");
+        parse_eat_whitechars(buf);
         break;
     case TR_PULSE:
         parse_char(buf,"(","'(' lparen");
+        parse_eat_whitechars(buf);
         trans->pulse.call = analysis_transient_call_pulse;
         trans->pulse.i1 = parse_value(buf,NULL,"pulse.i1");
         trans->pulse.i2 = parse_value(buf,NULL,"pulse.i2");
@@ -990,6 +995,7 @@ struct _transient_ *parse_transient(char **buf) {
         trans->pulse.pw = parse_value(buf,NULL,"pulse.pw");
         trans->pulse.per = parse_value(buf,NULL,"pulse.per");
         parse_char(buf,")","')' rparen");
+        parse_eat_whitechars(buf);
         trans->pulse.k = 0;
         break;
     case TR_PWL: {
@@ -1007,6 +1013,7 @@ struct _transient_ *parse_transient(char **buf) {
 
         while (*buf && **buf != '\r' && **buf != '\n') {
             parse_char(buf,"(","'(' lparen");
+            parse_eat_whitechars(buf);
             trans->pwl.pair[trans->pwl.next].time = parse_value(buf,NULL,"pwl pair (time field)");
             trans->pwl.pair[trans->pwl.next].value = parse_value(buf,NULL,"pwl pair (value field)");
             trans->pwl.next++;
@@ -1014,6 +1021,7 @@ struct _transient_ *parse_transient(char **buf) {
                  sizeof(struct transient_pwl_pair),trans->pwl.next,
                  NO_REBUILD);
             parse_char(buf,")","')' rparen");
+            parse_eat_whitechars(buf);
         }
         break;
     }
@@ -1089,6 +1097,7 @@ void parse_print_plot_item(char **buf, struct command *cmd) {
     }
 
     char el_type = parse_char(buf,"vi","print/plot type");
+    parse_eat_whitechars(buf);
     assert(el_type == 'v' || el_type == 'i');
 
     parse_eat_whitechars(buf);
