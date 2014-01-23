@@ -1126,7 +1126,7 @@ static void analyse_init_solver(struct analysis_info *analysis,
     }
 }
 
-static void analyse_one_dc_step(struct netlist_info *netlist,
+static void analyse_dc_one_step(struct netlist_info *netlist,
                                 struct analysis_info *analysis,
                                 enum solver _solver, dfloat_t tol) {
     switch (_solver) {
@@ -1212,7 +1212,7 @@ static void analyse_dc(struct cmd_dc *dc,
     unsigned long repeat = (dc->end - dc->begin)/dc->step;
     for (i=0; i<repeat; ++i) {
         analyse_dc_update(dc,netlist,analysis,_solver,tol);
-        analyse_one_dc_step(netlist,analysis,_solver,tol);
+        analyse_dc_one_step(netlist,analysis,_solver,tol);
     }
 }
 
@@ -1322,7 +1322,7 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
     if (dc_cmd)
         analyse_dc(&dc_cmd->dc,netlist,analysis,_solver,tol);
     else {
-        analyse_one_dc_step(netlist,analysis,_solver,tol);
+        analyse_dc_one_step(netlist,analysis,_solver,tol);
         if (_transient_method != T_NONE) {
             struct command *tran_cmd = get_tran(netlist->cmd_pool,netlist->cmd_pool_size);
             analyse_transient(&tran_cmd->transient,_transient_method, netlist,analysis,_solver,tol);
