@@ -122,7 +122,6 @@ enum transient_type {
 };
 
 struct transient_exp {
-    dfloat_t (*call)(struct transient_exp *data);
     dfloat_t i1;
     dfloat_t i2;
     dfloat_t td1;  // int ??
@@ -132,7 +131,6 @@ struct transient_exp {
 };
 
 struct transient_sin {
-    dfloat_t (*call)(struct transient_sin *data);
     dfloat_t i1;
     dfloat_t ia;
     dfloat_t fr;  // int ??
@@ -142,7 +140,6 @@ struct transient_sin {
 };
 
 struct transient_pulse {
-    dfloat_t (*call)(struct transient_pulse *data);
     dfloat_t i1;
     dfloat_t i2;
     dfloat_t td;  // int ??
@@ -159,7 +156,6 @@ struct transient_pwl_pair {
 };
 
 struct transient_pwl {
-    dfloat_t (*call)(struct transient_pwl *data);
     struct transient_pwl_pair *pair;
     unsigned long size;
     unsigned long next;
@@ -167,13 +163,20 @@ struct transient_pwl {
 
 struct _transient_ {
     enum transient_type type;
-    union {
+    union _data_ {
         struct transient_exp exp;
         struct transient_sin sin;
         struct transient_pulse pulse;
         struct transient_pwl pwl;
         void *raw_ptr;
-    };
+    } data;
+    union _call_ {
+        dfloat_t (*exp)(struct transient_exp *data);
+        dfloat_t (*sin)(struct transient_sin *data);
+        dfloat_t (*pulse)(struct transient_pulse *data);
+        dfloat_t (*pwl)(struct transient_pwl *data);
+        void *raw_ptr;
+    } update;
 };
 
 struct _source_ {

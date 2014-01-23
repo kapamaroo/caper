@@ -56,6 +56,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     unsigned long mna_dim_size = _n + el_group2_size;
 
     cs *cs_mna_matrix = NULL;
+    cs *cs_transient_matrix = NULL;
     dfloat_t *mna_matrix = NULL;
     if (use_sparse) {
         unsigned long nonzeros = count_nonzeros(netlist);
@@ -65,6 +66,12 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
 
         cs_mna_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
         if (!cs_mna_matrix) {
+            perror(__FUNCTION__);
+            exit(EXIT_FAILURE);
+        }
+
+        cs_transient_matrix = cs_spalloc(mna_dim_size,mna_dim_size,nonzeros,1,1);
+        if (!cs_transient_matrix) {
             perror(__FUNCTION__);
             exit(EXIT_FAILURE);
         }
@@ -175,6 +182,31 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
                 mna_vector[col] = el->value;
                 break;
             }
+            case 'c': {
+                if (_transient_method == T_NONE)
+                    break;
+
+                assert(_node == el->c->vplus._node || _node == el->c->vminus._node);
+                unsigned long this_node  = row;
+                unsigned long other_node = (_node != el->c->vplus._node) ? el->c->vplus.nuid : el->c->vminus.nuid;
+                dfloat_t value = el->value;
+
+                if (use_sparse) {
+                    //diagonal entry
+                    cs_entry(cs_transient_matrix,this_node,this_node,value);
+                    //off diagonal entry
+                    if (other_node--)
+                        cs_entry(cs_transient_matrix,this_node,other_node,-value);
+                }
+                else {
+                    //diagonal entry
+                    transient_matrix[this_node*mna_dim_size + this_node] += value;
+                    //off diagonal entry
+                    if (other_node--)
+                        transient_matrix[this_node*mna_dim_size + other_node] += -value;
+                }
+                break;
+            }
             case 'l': {
                 assert(_node == el->l->vplus._node || _node == el->l->vminus._node);
                 dfloat_t value = (_node == el->l->vplus._node) ? +1 : -1;
@@ -193,6 +225,16 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
                     //group2 element, populate A2 transposed
                     mna_matrix[col*mna_dim_size + row] = value;
                 }
+
+                if (_transient_method == T_NONE)
+                    break;
+
+                unsigned long row = col;
+                if (use_sparse)
+                    cs_entry(cs_transient_matrix,row,col,-el->value);
+                else
+                    transient_matrix[row*mna_dim_size + col] = -el->value;
+
                 break;
             }
             case 'i': {
@@ -215,6 +257,14 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
             printf("cs_dupl() failed - exit.\n");
             exit(EXIT_FAILURE);
         }
+        if (_transient_method != T_NONE) {
+            cs_transient_matrix = cs_compress(cs_transient_matrix);
+            MSG("deduplicate entries ...")
+            if (!cs_dupl(cs_mna_matrix)) {
+                printf("cs_dupl() failed - exit.\n");
+                exit(EXIT_FAILURE);
+            }
+        }
     }
 
     analysis->n = _n;
@@ -229,6 +279,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
     analysis->mna_vector = mna_vector;
 
     analysis->cs_mna_matrix = cs_mna_matrix;
+    analysis->cs_transient_matrix = cs_transient_matrix;
     analysis->mna_matrix = mna_matrix;
     analysis->transient_matrix = transient_matrix;
 
@@ -1286,14 +1337,127 @@ static struct command *get_tran(struct command *pool, unsigned long size) {
     return NULL;
 }
 
+static void analyse_transient_update(struct netlist_info *netlist,
+                                     struct analysis_info *analysis) {
+    unsigned long i;
+    for (i=0; i<netlist->el_group1_size; ++i) {
+        struct element *el = &netlist->el_group1_pool[i];
+        if (el->type == 'i') {
+            struct _transient_ *tran = el->i->transient;
+            if (!tran)
+                continue;
+            if (el->i->vplus._node->nuid) {
+                unsigned long idx = el->i->vplus._node->nuid - 1;
+                switch (tran->type) {
+                case TR_EXP:
+                    analysis->mna_vector[idx] = -tran->update.exp(&tran->data.exp);
+                    break;
+                case TR_SIN:
+                    analysis->mna_vector[idx] = -tran->update.sin(&tran->data.sin);
+                    break;
+                case TR_PULSE:
+                    analysis->mna_vector[idx] = -tran->update.pulse(&tran->data.pulse);
+                    break;
+                case TR_PWL:
+                    analysis->mna_vector[idx] = -tran->update.pwl(&tran->data.pwl);
+                    break;
+                }
+            }
+            if (el->i->vminus._node->nuid) {
+                unsigned long idx = el->i->vminus._node->nuid - 1;
+                switch (tran->type) {
+                case TR_EXP:
+                    analysis->mna_vector[idx] = tran->update.exp(&tran->data.exp);
+                    break;
+                case TR_SIN:
+                    analysis->mna_vector[idx] = tran->update.sin(&tran->data.sin);
+                    break;
+                case TR_PULSE:
+                    analysis->mna_vector[idx] = tran->update.pulse(&tran->data.pulse);
+                    break;
+                case TR_PWL:
+                    analysis->mna_vector[idx] = tran->update.pwl(&tran->data.pwl);
+                    break;
+                }
+            }
+        }
+    }
+
+    for (i=0; i<netlist->el_group2_size; ++i) {
+        struct element *el = &netlist->el_group2_pool[i];
+        if (el->type == 'v') {
+            struct _transient_ *tran = el->v->transient;
+            if (!tran)
+                continue;
+            unsigned long idx = analysis->n + el->idx;
+            switch (tran->type) {
+            case TR_EXP:
+                analysis->mna_vector[idx] = tran->update.exp(&tran->data.exp);
+                break;
+            case TR_SIN:
+                analysis->mna_vector[idx] = tran->update.sin(&tran->data.sin);
+                break;
+            case TR_PULSE:
+                analysis->mna_vector[idx] = tran->update.pulse(&tran->data.pulse);
+                break;
+            case TR_PWL:
+                analysis->mna_vector[idx] = tran->update.pwl(&tran->data.pwl);
+                break;
+            }
+        }
+    }
+}
+
+static void analyse_transient_one_step(struct netlist_info *netlist,
+                                       struct analysis_info *analysis,
+                                       enum transient_method _transient_method,
+                                       dfloat_t *x_prev, const dfloat_t time_step) {
+    //implement me
+    unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
+    dfloat_t *tmp = (dfloat_t *)malloc(mna_dim_size * sizeof(dfloat_t));
+    if (!tmp) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    _mult(tmp,analysis->transient_matrix,x_prev,mna_dim_size);
+    _dot_add(tmp,analysis->mna_vector,1/time_step,tmp,mna_dim_size);
+
+    dfloat_t *orig_mna_vector = analysis->mna_vector;
+    analysis->mna_vector = tmp;
+
+    solve_LU(analysis);
+    analysis->mna_vector = orig_mna_vector;
+
+    free(tmp);
+}
+
 void analyse_transient(struct cmd_tran *transient,
-                       enum transient_method _transient_method,
                        struct netlist_info *netlist,
                        struct analysis_info *analysis,
-                       enum solver _solver, dfloat_t tol) {
-    //implement me
-
+                       enum transient_method _transient_method, dfloat_t tol) {
     //we are at dc point, see analyse_mna()
+    unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
+    dfloat_t *x_prev = (dfloat_t *)malloc(mna_dim_size * sizeof(dfloat_t));
+    if (!x_prev) {
+        perror(__FUNCTION__);
+        exit(EXIT_FAILURE);
+    }
+
+    //calculate G + 1/h * C
+    _dot_add(analysis->mna_matrix,analysis->mna_matrix,1/transient->time_step,
+             analysis->transient_matrix,mna_dim_size*mna_dim_size);
+    decomp_LU(analysis);
+
+    unsigned long time_slots = ceil(transient->fin_time/transient->time_step);
+    unsigned long i;
+    for (i=0; i<time_slots; ++i) {
+        memcpy(x_prev,analysis->x,mna_dim_size * sizeof(dfloat_t));
+        analyse_transient_update(netlist,analysis);
+        analyse_transient_one_step(netlist,analysis,_transient_method,x_prev,transient->time_step);
+    }
+
+    free(x_prev);
 }
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
@@ -1325,7 +1489,7 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
         analyse_dc_one_step(netlist,analysis,_solver,tol);
         if (_transient_method != T_NONE) {
             struct command *tran_cmd = get_tran(netlist->cmd_pool,netlist->cmd_pool_size);
-            analyse_transient(&tran_cmd->transient,_transient_method, netlist,analysis,_solver,tol);
+            analyse_transient(&tran_cmd->transient,netlist,analysis,_transient_method,tol);
         }
     }
 

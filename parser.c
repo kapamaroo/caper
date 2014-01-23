@@ -874,14 +874,14 @@ static dfloat_t get_init_transient_value(struct element *el) {
 
     switch (s->transient->type) {
     case TR_EXP:
-        return s->transient->exp.i1;
+        return s->transient->data.exp.i1;
     case TR_SIN:
-        return s->transient->sin.i1;
+        return s->transient->data.sin.i1;
     case TR_PULSE:
-        return s->transient->pulse.i1;
+        return s->transient->data.pulse.i1;
     case TR_PWL:
-        if (s->transient->pwl.next && s->transient->pwl.pair[0].time == 0)
-            return s->transient->pwl.pair[0].value;
+        if (s->transient->data.pwl.next && s->transient->data.pwl.pair[0].time == 0)
+            return s->transient->data.pwl.pair[0].value;
         return el->value;
     }
     return el->value;
@@ -993,53 +993,54 @@ struct _transient_ *parse_transient(char **buf) {
     case TR_EXP:
         parse_char(buf,"(","'(' lparen");
         parse_eat_whitechars(buf);
-        trans->exp.call = analysis_transient_call_exp;
-        trans->exp.i1 = parse_value(buf,NULL,"exp.i1");
-        trans->exp.i2 = parse_value(buf,NULL,"exp.i2");
-        trans->exp.td1 = parse_value(buf,NULL,"exp.td1");
-        trans->exp.tc1 = parse_value(buf,NULL,"exp.tc1");
-        trans->exp.td2 = parse_value(buf,NULL,"exp.td2");
-        trans->exp.tc2 = parse_value(buf,NULL,"exp.tc2");
+        trans->update.exp = analysis_transient_call_exp;
+        trans->data.exp.i1 = parse_value(buf,NULL,"exp.i1");
+        trans->data.exp.i2 = parse_value(buf,NULL,"exp.i2");
+        trans->data.exp.td1 = parse_value(buf,NULL,"exp.td1");
+        trans->data.exp.tc1 = parse_value(buf,NULL,"exp.tc1");
+        trans->data.exp.td2 = parse_value(buf,NULL,"exp.td2");
+        trans->data.exp.tc2 = parse_value(buf,NULL,"exp.tc2");
         parse_char(buf,")","')' rparen");
         parse_eat_whitechars(buf);
         break;
     case TR_SIN:
         parse_char(buf,"(","'(' lparen");
         parse_eat_whitechars(buf);
-        trans->sin.call = analysis_transient_call_sin;
-        trans->sin.i1 = parse_value(buf,NULL,"sin.i1");
-        trans->sin.ia = parse_value(buf,NULL,"sin.ia");
-        trans->sin.fr = parse_value(buf,NULL,"sin.fr");
-        trans->sin.td = parse_value(buf,NULL,"sin.td");
-        trans->sin.df = parse_value(buf,NULL,"sin.df");
-        trans->sin.ph = parse_value(buf,NULL,"sin.ph");
+        trans->update.sin = analysis_transient_call_sin;
+        trans->data.sin.i1 = parse_value(buf,NULL,"sin.i1");
+        trans->data.sin.ia = parse_value(buf,NULL,"sin.ia");
+        trans->data.sin.fr = parse_value(buf,NULL,"sin.fr");
+        trans->data.sin.td = parse_value(buf,NULL,"sin.td");
+        trans->data.sin.df = parse_value(buf,NULL,"sin.df");
+        trans->data.sin.ph = parse_value(buf,NULL,"sin.ph");
         parse_char(buf,")","')' rparen");
         parse_eat_whitechars(buf);
         break;
     case TR_PULSE:
         parse_char(buf,"(","'(' lparen");
         parse_eat_whitechars(buf);
-        trans->pulse.call = analysis_transient_call_pulse;
-        trans->pulse.i1 = parse_value(buf,NULL,"pulse.i1");
-        trans->pulse.i2 = parse_value(buf,NULL,"pulse.i2");
-        trans->pulse.td = parse_value(buf,NULL,"pulse.td");
-        trans->pulse.tr = parse_value(buf,NULL,"pulse.tr");
-        trans->pulse.tf = parse_value(buf,NULL,"pulse.tf");
-        trans->pulse.pw = parse_value(buf,NULL,"pulse.pw");
-        trans->pulse.per = parse_value(buf,NULL,"pulse.per");
+        trans->update.pulse = analysis_transient_call_pulse;
+        trans->data.pulse.i1 = parse_value(buf,NULL,"pulse.i1");
+        trans->data.pulse.i2 = parse_value(buf,NULL,"pulse.i2");
+        trans->data.pulse.td = parse_value(buf,NULL,"pulse.td");
+        trans->data.pulse.tr = parse_value(buf,NULL,"pulse.tr");
+        trans->data.pulse.tf = parse_value(buf,NULL,"pulse.tf");
+        trans->data.pulse.pw = parse_value(buf,NULL,"pulse.pw");
+        trans->data.pulse.per = parse_value(buf,NULL,"pulse.per");
         parse_char(buf,")","')' rparen");
         parse_eat_whitechars(buf);
-        trans->pulse.k = 0;
+        trans->data.pulse.k = 0;
         break;
     case TR_PWL: {
         const int default_pair_size = 8;
 
-        trans->pwl.call = analysis_transient_call_pwl;
-        trans->pwl.size = default_pair_size;
-        trans->pwl.next = 0;
-        trans->pwl.pair = (struct transient_pwl_pair *)calloc(default_pair_size,
-                                                              sizeof(struct transient_pwl_pair));
-        if (!trans->pwl.pair) {
+        trans->update.pwl = analysis_transient_call_pwl;
+        trans->data.pwl.size = default_pair_size;
+        trans->data.pwl.next = 0;
+        trans->data.pwl.pair =
+            (struct transient_pwl_pair *)calloc(default_pair_size,
+                                                sizeof(struct transient_pwl_pair));
+        if (!trans->data.pwl.pair) {
             perror(__FUNCTION__);
             exit(EXIT_FAILURE);
         }
@@ -1047,11 +1048,13 @@ struct _transient_ *parse_transient(char **buf) {
         while (*buf && **buf != '\r' && **buf != '\n') {
             parse_char(buf,"(","'(' lparen");
             parse_eat_whitechars(buf);
-            trans->pwl.pair[trans->pwl.next].time = parse_value(buf,NULL,"pwl pair (time field)");
-            trans->pwl.pair[trans->pwl.next].value = parse_value(buf,NULL,"pwl pair (value field)");
-            trans->pwl.next++;
-            grow((void **)&trans->pwl.pair,trans->pwl.size,
-                 sizeof(struct transient_pwl_pair),trans->pwl.next,
+            trans->data.pwl.pair[trans->data.pwl.next].time =
+                parse_value(buf,NULL,"pwl pair (time field)");
+            trans->data.pwl.pair[trans->data.pwl.next].value =
+                parse_value(buf,NULL,"pwl pair (value field)");
+            trans->data.pwl.next++;
+            grow((void **)&trans->data.pwl.pair,trans->data.pwl.size,
+                 sizeof(struct transient_pwl_pair),trans->data.pwl.next,
                  NO_REBUILD);
             parse_char(buf,")","')' rparen");
             parse_eat_whitechars(buf);
@@ -1325,7 +1328,17 @@ void parse_command(char **buf) {
     }
     case CMD_TRAN:
         new_cmd.transient.time_step = parse_value(buf,NULL,"transsient time_step");
+        if (new_cmd.transient.time_step <= 0.0) {
+            printf("error:%lu: time_step must be positive - exit.\n",line_num);
+            exit(EXIT_FAILURE);
+        }
         new_cmd.transient.fin_time = parse_value(buf,NULL,"transsient fin_time");
+        if (new_cmd.transient.fin_time <= 0.0 ||
+            new_cmd.transient.fin_time < new_cmd.transient.fin_time) {
+            printf("error:%lu: fin_time must be positive and >= to time_step - exit.\n",line_num);
+            exit(EXIT_FAILURE);
+        }
+
         break;
     default:  assert(0);
     }

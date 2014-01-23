@@ -32,7 +32,8 @@ struct analysis_info {
     dfloat_t *transient_matrix;
 
     //sparse matrix members
-    cs *cs_mna_matrix;
+    cs *cs_mna_matrix;        //G
+    cs *cs_transient_matrix;  //C
     csn *cs_mna_N;
     css *cs_mna_S;
 };
