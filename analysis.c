@@ -1474,6 +1474,7 @@ static void analyse_transient_euler_one_step(struct netlist_info *netlist,
         analysis->mna_vector = orig_mna_vector;
     }
     free(tmp);
+    write_results(netlist,analysis);
 }
 
 static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
@@ -1568,6 +1569,7 @@ static void analyse_transient_trapezoid_one_step(struct netlist_info *netlist,
         analysis->mna_vector = orig_mna_vector;
     }
     free(tmp);
+    write_results(netlist,analysis);
 }
 
 void analyse_transient(struct cmd_tran *transient,
