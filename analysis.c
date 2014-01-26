@@ -19,32 +19,16 @@
 
 #define BI_CG_EPSILON 1e-14
 
-enum solver {
-    S_LU = 0,
-    S_SPD,
-    S_ITER,
-    S_SPD_ITER,
-
-    S_LU_SPARSE,
-    S_SPD_SPARSE,
-    S_ITER_SPARSE,
-    S_SPD_ITER_SPARSE
-};
-
-enum transient_method {
-    T_NONE = 0,
-    T_TR,  //trapezoidal
-    T_BE   //backward-euler
-};
-
 void fprint_dfloat_array(const char *filename,
                          unsigned long row, unsigned long col, dfloat_t *p);
 static unsigned long count_nonzeros(struct netlist_info *netlist);
 static void analyse_init_solver(struct analysis_info *analysis,enum solver _solver);
 
-void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis,
-                   const int use_sparse, const enum solver _solver,
-                   const enum transient_method _transient_method) {
+void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis) {
+    const int use_sparse = analysis->use_sparse;
+    const enum solver _solver = analysis->_solver;
+    const enum transient_method _transient_method = analysis->_transient_method;
+
     printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
     //the last node we care
     //also the number of nodes without considering the ground
@@ -1095,8 +1079,7 @@ static inline enum solver option_to_solver(int *option, const int use_sparse) {
     return S_LU;
 }
 
-static inline enum solver option_to_transient(int *option, const int use_sparse) {
-    //ignore sparse for now
+static inline enum solver option_to_transient(int *option) {
     if (option[CMD_OPT_METHOD_TR])
         return T_TR;
     if (option[CMD_OPT_METHOD_BE])
@@ -1119,8 +1102,7 @@ static enum solver get_solver(struct command *pool, unsigned long size, const in
     return use_sparse ? S_LU_SPARSE : S_LU;
 }
 
-static enum transient_method get_transient_method(struct command *pool, unsigned long size,
-                                                  const int use_sparse) {
+static enum transient_method get_transient_method(struct command *pool, unsigned long size) {
     //last transient wins!
 
     enum transient_method _transient = T_NONE;
@@ -1142,7 +1124,7 @@ static enum transient_method get_transient_method(struct command *pool, unsigned
     for (i=0; i<size; ++i) {
         struct command *cmd = &pool[size - 1 - i];
         if (cmd->type == CMD_OPTION) {
-            enum transient_method _transient = option_to_transient(cmd->option,use_sparse);
+            enum transient_method _transient = option_to_transient(cmd->option);
             if (_transient != T_NONE)
                 return _transient;
         }
@@ -1181,9 +1163,9 @@ static void analyse_init_solver(struct analysis_info *analysis,
 }
 
 static void analyse_dc_one_step(struct netlist_info *netlist,
-                                struct analysis_info *analysis,
-                                enum solver _solver, dfloat_t tol) {
-    switch (_solver) {
+                                struct analysis_info *analysis) {
+    dfloat_t tol = analysis->tol;
+    switch (analysis->_solver) {
     case S_SPD:       solve_cholesky(analysis);   break;
     case S_ITER:      solve_bi_cg(analysis,tol);  break;
     case S_SPD_ITER:  solve_cg(analysis,tol);     break;
@@ -1258,15 +1240,17 @@ static void analyse_dc_update(struct cmd_dc *dc,
 
 static void analyse_dc(struct cmd_dc *dc,
                        struct netlist_info *netlist,
-                       struct analysis_info *analysis,
-                       enum solver _solver, dfloat_t tol) {
+                       struct analysis_info *analysis) {
+    enum solver _solver = analysis->_solver;
+    dfloat_t tol = analysis->tol;
+
     DEBUG_MSG("")
     analyse_dc_init(dc,netlist,analysis,_solver,tol);
     unsigned long i;
     unsigned long repeat = (dc->end - dc->begin)/dc->step;
     for (i=0; i<repeat; ++i) {
         analyse_dc_update(dc,netlist,analysis,_solver,tol);
-        analyse_dc_one_step(netlist,analysis,_solver,tol);
+        analyse_dc_one_step(netlist,analysis);
     }
 }
 
@@ -1308,7 +1292,9 @@ static void close_logfiles(struct netlist_info *netlist) {
     }
 }
 
-static void analyse_log(struct analysis_info *analysis,const int use_sparse) {
+static void analyse_log(struct analysis_info *analysis) {
+    const int use_sparse = analysis->use_sparse;
+
     MSG("writing A and b to files ...")
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     if (use_sparse)
@@ -1412,7 +1398,8 @@ static void analyse_transient_update(struct netlist_info *netlist,
 }
 
 static void analysis_transient_euler_init(struct analysis_info *analysis,
-                                          struct cmd_tran *transient, const int use_sparse) {
+                                          struct cmd_tran *transient) {
+    const int use_sparse = analysis->use_sparse;
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     //calculate G + 1/h * C
 
@@ -1440,9 +1427,9 @@ static void analysis_transient_euler_init(struct analysis_info *analysis,
 
 static void analyse_transient_euler_one_step(struct netlist_info *netlist,
                                              struct analysis_info *analysis,
-                                             enum transient_method _transient_method,
-                                             dfloat_t *x_prev, const dfloat_t time_step,
-                                             const int use_sparse) {
+                                             dfloat_t *x_prev, const dfloat_t time_step) {
+    const int use_sparse = analysis->use_sparse;
+
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     dfloat_t *tmp = (dfloat_t *)malloc(mna_dim_size * sizeof(dfloat_t));
     if (!tmp) {
@@ -1478,7 +1465,9 @@ static void analyse_transient_euler_one_step(struct netlist_info *netlist,
 }
 
 static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
-                                              struct cmd_tran *transient, const int use_sparse) {
+                                              struct cmd_tran *transient) {
+    const int use_sparse = analysis->use_sparse;
+
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
 
     dfloat_t h = 2/transient->time_step;
@@ -1533,10 +1522,10 @@ static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
 
 static void analyse_transient_trapezoid_one_step(struct netlist_info *netlist,
                                                  struct analysis_info *analysis,
-                                                 enum transient_method _transient_method,
                                                  dfloat_t *x_prev, dfloat_t *vector_prev,
-                                                 const dfloat_t time_step,
-                                                 const int use_sparse) {
+                                                 const dfloat_t time_step) {
+    const int use_sparse = analysis->use_sparse;
+
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     dfloat_t *tmp = (dfloat_t *)malloc(mna_dim_size * sizeof(dfloat_t));
     if (!tmp) {
@@ -1574,9 +1563,9 @@ static void analyse_transient_trapezoid_one_step(struct netlist_info *netlist,
 
 void analyse_transient(struct cmd_tran *transient,
                        struct netlist_info *netlist,
-                       struct analysis_info *analysis,
-                       enum transient_method _transient_method,
-                       const int use_sparse, dfloat_t tol) {
+                       struct analysis_info *analysis) {
+    enum transient_method _transient_method = analysis->_transient_method;
+
     //we are at dc point, see analyse_mna()
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     dfloat_t *x_prev = (dfloat_t *)malloc(mna_dim_size * sizeof(dfloat_t));
@@ -1597,24 +1586,24 @@ void analyse_transient(struct cmd_tran *transient,
             exit(EXIT_FAILURE);
         }
 
-        analysis_transient_trapezoid_init(analysis,transient,use_sparse);
+        analysis_transient_trapezoid_init(analysis,transient);
         for (i=0; i<time_slots; ++i) {
             memcpy(x_prev,analysis->x,mna_dim_size * sizeof(dfloat_t));
             memcpy(vector_prev,analysis->mna_vector,mna_dim_size * sizeof(dfloat_t));
             analyse_transient_update(netlist,analysis);
-            analyse_transient_trapezoid_one_step(netlist,analysis,_transient_method,
-                                                 x_prev,vector_prev,transient->time_step,use_sparse);
+            analyse_transient_trapezoid_one_step(netlist,analysis,x_prev,
+                                                 vector_prev,transient->time_step);
         }
         free(vector_prev);
         break;
     }
     case T_BE:
-        analysis_transient_euler_init(analysis,transient,use_sparse);
+        analysis_transient_euler_init(analysis,transient);
         for (i=0; i<time_slots; ++i) {
             memcpy(x_prev,analysis->x,mna_dim_size * sizeof(dfloat_t));
             analyse_transient_update(netlist,analysis);
-            analyse_transient_euler_one_step(netlist,analysis,_transient_method,
-                                             x_prev,transient->time_step,use_sparse);
+            analyse_transient_euler_one_step(netlist,analysis,x_prev,
+                                             transient->time_step);
         }
         break;
     }
@@ -1628,30 +1617,29 @@ void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis) {
 
     memset(analysis,0,sizeof(struct analysis_info));
 
-    int use_sparse = get_sparse(netlist->cmd_pool,netlist->cmd_pool_size);
-    enum solver _solver =
-        get_solver(netlist->cmd_pool,netlist->cmd_pool_size,use_sparse);
-    enum transient_method _transient_method =
-        get_transient_method(netlist->cmd_pool,netlist->cmd_pool_size,use_sparse);
-    dfloat_t tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);
+    analysis->use_sparse = get_sparse(netlist->cmd_pool,netlist->cmd_pool_size);
+    analysis->_solver =
+        get_solver(netlist->cmd_pool,netlist->cmd_pool_size,analysis->use_sparse);
+    analysis->_transient_method =
+        get_transient_method(netlist->cmd_pool,netlist->cmd_pool_size);
+    analysis->tol = get_tolerance(netlist->cmd_pool,netlist->cmd_pool_size);
 
-    printf("debug: tolerance value = %g\n",tol);
-    printf("debug: use_sparse = %d\n",use_sparse);
-    printf("\n");
+    if (analysis->use_sparse)
+        DEBUG_MSG("use sparse matrices");
 
-    analysis_init(netlist,analysis,use_sparse,_solver,_transient_method);
-    analyse_log(analysis,use_sparse);
+    analysis_init(netlist,analysis);
+    analyse_log(analysis);
 
     open_logfiles(netlist);
 
     struct command *dc_cmd = get_dc(netlist->cmd_pool,netlist->cmd_pool_size);
     if (dc_cmd)
-        analyse_dc(&dc_cmd->dc,netlist,analysis,_solver,tol);
+        analyse_dc(&dc_cmd->dc,netlist,analysis);
     else {
-        analyse_dc_one_step(netlist,analysis,_solver,tol);
-        if (_transient_method != T_NONE) {
+        analyse_dc_one_step(netlist,analysis);
+        if (analysis->_transient_method != T_NONE) {
             struct command *tran_cmd = get_tran(netlist->cmd_pool,netlist->cmd_pool_size);
-            analyse_transient(&tran_cmd->transient,netlist,analysis,_transient_method,use_sparse,tol);
+            analyse_transient(&tran_cmd->transient,netlist,analysis);
         }
     }
 

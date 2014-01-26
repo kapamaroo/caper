@@ -5,6 +5,24 @@
 #include <gsl/gsl_permutation.h>
 #include "csparse/csparse.h"
 
+enum solver {
+    S_LU = 0,
+    S_SPD,
+    S_ITER,
+    S_SPD_ITER,
+
+    S_LU_SPARSE,
+    S_SPD_SPARSE,
+    S_ITER_SPARSE,
+    S_SPD_ITER_SPARSE
+};
+
+enum transient_method {
+    T_NONE = 0,
+    T_TR,  //trapezoidal
+    T_BE   //backward-euler
+};
+
 struct analysis_info {
     int error;
 
@@ -36,6 +54,11 @@ struct analysis_info {
     cs *cs_transient_matrix;  //C
     csn *cs_mna_N;
     css *cs_mna_S;
+
+    int use_sparse;
+    enum solver _solver;
+    enum transient_method _transient_method;
+    dfloat_t tol;
 };
 
 void analyse_mna(struct netlist_info *netlist, struct analysis_info *analysis);
