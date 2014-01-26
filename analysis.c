@@ -1451,7 +1451,7 @@ static void analyse_transient_euler_one_step(struct netlist_info *netlist,
     }
 
     if (use_sparse) {
-        memcpy(tmp,analysis->mna_vector,mna_dim_size);
+        memcpy(tmp,analysis->mna_vector,mna_dim_size*sizeof(dfloat_t));
         if (!cs_gaxpy(analysis->cs_transient_matrix,x_prev,tmp)) {
             printf("cs_gaxpy() failed - exit.\n");
             exit(EXIT_FAILURE);
@@ -1488,7 +1488,7 @@ static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
             cs_add(analysis->cs_mna_matrix,analysis->cs_transient_matrix,1,h);
         decomp_LU_sparse(analysis);
 
-        //compute 1(G - h*C)
+        //compute -(G - h * C)
         cs *tmp2 = analysis->cs_transient_matrix;
         analysis->cs_transient_matrix =
             cs_add(tmp,analysis->cs_transient_matrix,-1,h);
@@ -1509,19 +1509,22 @@ static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
             exit(EXIT_FAILURE);
         }
 
-        //calculate G + 2/h * C
+        //calculate G + h * C
         _dot_add(left_array,analysis->mna_matrix,h,
                  analysis->transient_matrix,mna_dim_size*mna_dim_size);
 
-        //calculate G - 2/h * C
-        _dot_add(left_array,analysis->mna_matrix,-h,
+        //calculate G - h * C
+        _dot_add(right_array,analysis->mna_matrix,-h,
                  analysis->transient_matrix,mna_dim_size*mna_dim_size);
 
-        memcpy(analysis->mna_matrix,left_array,mna_dim_size * mna_dim_size);
-        memcpy(analysis->transient_matrix,right_array,mna_dim_size * mna_dim_size);
+        dfloat_t *old;
+        old = analysis->mna_matrix;
+        analysis->mna_matrix = left_array;
+        free(old);
 
-        free(left_array);
-        free(right_array);
+        old = analysis->transient_matrix;
+        analysis->transient_matrix = right_array;
+        free(old);
 
         decomp_LU(analysis);
     }
