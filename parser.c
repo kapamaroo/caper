@@ -1029,7 +1029,6 @@ struct _transient_ *parse_transient(char **buf) {
         trans->data.pulse.per = parse_value(buf,NULL,"pulse.per");
         parse_char(buf,")","')' rparen");
         parse_eat_whitechars(buf);
-        trans->data.pulse.k = 0;
         break;
     case TR_PWL: {
         const int default_pair_size = 8;

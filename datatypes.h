@@ -147,7 +147,6 @@ struct transient_pulse {
     dfloat_t tf;
     dfloat_t pw;
     dfloat_t per;  // int ??
-    unsigned long k;  // internal helper
 };
 
 struct transient_pwl_pair {
@@ -171,10 +170,10 @@ struct _transient_ {
         void *raw_ptr;
     } data;
     union _call_ {
-        dfloat_t (*exp)(struct transient_exp *data);
-        dfloat_t (*sin)(struct transient_sin *data);
-        dfloat_t (*pulse)(struct transient_pulse *data);
-        dfloat_t (*pwl)(struct transient_pwl *data);
+        dfloat_t (*exp)(struct transient_exp *data, const dfloat_t abs_time);
+        dfloat_t (*sin)(struct transient_sin *data, const dfloat_t abs_time);
+        dfloat_t (*pulse)(struct transient_pulse *data, const dfloat_t abs_time);
+        dfloat_t (*pwl)(struct transient_pwl *data, const dfloat_t abs_time);
         void *raw_ptr;
     } update;
 };

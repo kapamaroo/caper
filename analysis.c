@@ -1327,7 +1327,8 @@ static struct command *get_tran(struct command *pool, unsigned long size) {
 }
 
 static void analyse_transient_update(struct netlist_info *netlist,
-                                     struct analysis_info *analysis) {
+                                     struct analysis_info *analysis,
+                                     const dfloat_t abs_time) {
     unsigned long i;
     for (i=0; i<netlist->el_group1_size; ++i) {
         struct element *el = &netlist->el_group1_pool[i];
@@ -1339,16 +1340,16 @@ static void analyse_transient_update(struct netlist_info *netlist,
                 unsigned long idx = el->i->vplus._node->nuid - 1;
                 switch (tran->type) {
                 case TR_EXP:
-                    analysis->mna_vector[idx] = -tran->update.exp(&tran->data.exp);
+                    analysis->mna_vector[idx] = -tran->update.exp(&tran->data.exp,abs_time);
                     break;
                 case TR_SIN:
-                    analysis->mna_vector[idx] = -tran->update.sin(&tran->data.sin);
+                    analysis->mna_vector[idx] = -tran->update.sin(&tran->data.sin,abs_time);
                     break;
                 case TR_PULSE:
-                    analysis->mna_vector[idx] = -tran->update.pulse(&tran->data.pulse);
+                    analysis->mna_vector[idx] = -tran->update.pulse(&tran->data.pulse,abs_time);
                     break;
                 case TR_PWL:
-                    analysis->mna_vector[idx] = -tran->update.pwl(&tran->data.pwl);
+                    analysis->mna_vector[idx] = -tran->update.pwl(&tran->data.pwl,abs_time);
                     break;
                 }
             }
@@ -1356,16 +1357,16 @@ static void analyse_transient_update(struct netlist_info *netlist,
                 unsigned long idx = el->i->vminus._node->nuid - 1;
                 switch (tran->type) {
                 case TR_EXP:
-                    analysis->mna_vector[idx] = tran->update.exp(&tran->data.exp);
+                    analysis->mna_vector[idx] = tran->update.exp(&tran->data.exp,abs_time);
                     break;
                 case TR_SIN:
-                    analysis->mna_vector[idx] = tran->update.sin(&tran->data.sin);
+                    analysis->mna_vector[idx] = tran->update.sin(&tran->data.sin,abs_time);
                     break;
                 case TR_PULSE:
-                    analysis->mna_vector[idx] = tran->update.pulse(&tran->data.pulse);
+                    analysis->mna_vector[idx] = tran->update.pulse(&tran->data.pulse,abs_time);
                     break;
                 case TR_PWL:
-                    analysis->mna_vector[idx] = tran->update.pwl(&tran->data.pwl);
+                    analysis->mna_vector[idx] = tran->update.pwl(&tran->data.pwl,abs_time);
                     break;
                 }
             }
@@ -1381,16 +1382,16 @@ static void analyse_transient_update(struct netlist_info *netlist,
             unsigned long idx = analysis->n + el->idx;
             switch (tran->type) {
             case TR_EXP:
-                analysis->mna_vector[idx] = tran->update.exp(&tran->data.exp);
+                analysis->mna_vector[idx] = tran->update.exp(&tran->data.exp,abs_time);
                 break;
             case TR_SIN:
-                analysis->mna_vector[idx] = tran->update.sin(&tran->data.sin);
+                analysis->mna_vector[idx] = tran->update.sin(&tran->data.sin,abs_time);
                 break;
             case TR_PULSE:
-                analysis->mna_vector[idx] = tran->update.pulse(&tran->data.pulse);
+                analysis->mna_vector[idx] = tran->update.pulse(&tran->data.pulse,abs_time);
                 break;
             case TR_PWL:
-                analysis->mna_vector[idx] = tran->update.pwl(&tran->data.pwl);
+                analysis->mna_vector[idx] = tran->update.pwl(&tran->data.pwl,abs_time);
                 break;
             }
         }
@@ -1590,7 +1591,8 @@ void analyse_transient(struct cmd_tran *transient,
         for (i=0; i<time_slots; ++i) {
             memcpy(x_prev,analysis->x,mna_dim_size * sizeof(dfloat_t));
             memcpy(vector_prev,analysis->mna_vector,mna_dim_size * sizeof(dfloat_t));
-            analyse_transient_update(netlist,analysis);
+            dfloat_t abs_time = i * transient->time_step;
+            analyse_transient_update(netlist,analysis,abs_time);
             analyse_transient_trapezoid_one_step(netlist,analysis,x_prev,
                                                  vector_prev,transient->time_step);
         }
@@ -1601,7 +1603,8 @@ void analyse_transient(struct cmd_tran *transient,
         analysis_transient_euler_init(analysis,transient);
         for (i=0; i<time_slots; ++i) {
             memcpy(x_prev,analysis->x,mna_dim_size * sizeof(dfloat_t));
-            analyse_transient_update(netlist,analysis);
+            dfloat_t abs_time = i * transient->time_step;
+            analyse_transient_update(netlist,analysis,abs_time);
             analyse_transient_euler_one_step(netlist,analysis,x_prev,
                                              transient->time_step);
         }
