@@ -45,18 +45,18 @@ dfloat_t analysis_transient_call_pulse(struct transient_pulse *data, const dfloa
     dfloat_t out = data->i1;
 
     unsigned int k = floor(time / data->per);
-    printf("debug:  k=%u    time=%lf\n",k,time);
+    //printf("DEBUG:  k=%u    time=%lf\n",k,time);
 
     dfloat_t l0 =            k * data->per;
     dfloat_t r0 = data->td + k * data->per;
-    printf("debug:  l0=%lf    r0=%lf\n",l0,r0);
+    //printf("DEBUG:  l0=%lf    r0=%lf\n",l0,r0);
 
     if (l0 <= time && time <= r0)
         return data->i1;
 
     dfloat_t l1 = data->td            + k * data->per;
     dfloat_t r1 = data->td + data->tr + k * data->per;
-    printf("debug:  l1=%lf    r1=%lf\n",l1,r1);
+    //printf("DEBUG:  l1=%lf    r1=%lf\n",l1,r1);
 
     if (l1 <= time && time <= r1) {
         out = linear(data->i1,data->i2,l1,r1,time);
@@ -65,14 +65,14 @@ dfloat_t analysis_transient_call_pulse(struct transient_pulse *data, const dfloa
 
     dfloat_t l2 = r1;
     dfloat_t r2 = r1 + data->pw;
-    printf("debug:  l2=%lf    r2=%lf\n",l2,r2);
+    //printf("DEBUG:  l2=%lf    r2=%lf\n",l2,r2);
 
     if (l2 <= time && time <= r2)
         return data->i2;
 
     dfloat_t l3 = r2;
     dfloat_t r3 = r2 + data->tf;
-    printf("debug:  l3=%lf    r3=%lf\n",l3,r3);
+    //printf("DEBUG:  l3=%lf    r3=%lf\n",l3,r3);
 
     if (l3 <= time && time <= r3) {
         out = linear(data->i2,data->i1,l3,r3,time);
@@ -81,7 +81,7 @@ dfloat_t analysis_transient_call_pulse(struct transient_pulse *data, const dfloa
 
     dfloat_t l4 = r3;
     dfloat_t r4 = data->td + data->per + k * data->per;
-    printf("debug:  l4=%lf    r4=%lf\n",l4,r4);
+    //printf("DEBUG:  l4=%lf    r4=%lf\n",l4,r4);
 
     if (l4 <= time && time <= r4)
         return data->i1;
