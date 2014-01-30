@@ -1079,7 +1079,7 @@ static inline enum solver option_to_solver(int *option, const int use_sparse) {
     return S_LU;
 }
 
-static inline enum solver option_to_transient(int *option) {
+static inline enum transient_method option_to_transient(int *option) {
     if (option[CMD_OPT_METHOD_TR])
         return T_TR;
     if (option[CMD_OPT_METHOD_BE])
