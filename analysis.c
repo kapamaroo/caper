@@ -236,16 +236,17 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     }
 
     if (use_sparse) {
-        MSG("compress matrix ...")
+        MSG("compress DC matrix ...")
         cs_mna_matrix = cs_compress(cs_mna_matrix);
-        MSG("deduplicate entries ...")
+        MSG("deduplicate DC entries ...")
         if (!cs_dupl(cs_mna_matrix)) {
             printf("cs_dupl() failed - exit.\n");
             exit(EXIT_FAILURE);
         }
         if (_transient_method != T_NONE) {
+            MSG("compress transient matrix ...")
             cs_transient_matrix = cs_compress(cs_transient_matrix);
-            MSG("deduplicate entries ...")
+            MSG("deduplicate transient entries ...")
             if (!cs_dupl(cs_transient_matrix)){
                 printf("cs_dupl() failed - exit.\n");
                 exit(EXIT_FAILURE);
@@ -1163,6 +1164,7 @@ static void analyse_init_solver(struct analysis_info *analysis,
 
 static void analyse_dc_one_step(struct netlist_info *netlist,
                                 struct analysis_info *analysis) {
+    DEBUG_MSG("")
     dfloat_t tol = analysis->tol;
     switch (analysis->_solver) {
     case S_SPD:       solve_cholesky(analysis);   break;
@@ -1213,6 +1215,7 @@ static void analyse_dc_update(struct cmd_dc *dc,
                               struct netlist_info *netlist,
                               struct analysis_info *analysis,
                               enum solver _solver, dfloat_t tol) {
+    DEBUG_MSG("")
     unsigned long _n = analysis->n;
     struct element *el = dc->source._el;
     switch (el->type) {
@@ -1328,6 +1331,7 @@ static struct command *get_tran(struct command *pool, unsigned long size) {
 static void analyse_transient_update(struct netlist_info *netlist,
                                      struct analysis_info *analysis,
                                      const dfloat_t abs_time) {
+    DEBUG_MSG("")
     unsigned long i;
     for (i=0; i<netlist->el_group1_size; ++i) {
         struct element *el = &netlist->el_group1_pool[i];
@@ -1399,6 +1403,7 @@ static void analyse_transient_update(struct netlist_info *netlist,
 
 static void analysis_transient_euler_init(struct analysis_info *analysis,
                                           struct cmd_tran *transient) {
+    DEBUG_MSG("")
     const int use_sparse = analysis->use_sparse;
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     //calculate G + 1/h * C
@@ -1428,6 +1433,7 @@ static void analysis_transient_euler_init(struct analysis_info *analysis,
 static void analyse_transient_euler_one_step(struct netlist_info *netlist,
                                              struct analysis_info *analysis,
                                              dfloat_t *x_prev, const dfloat_t time_step) {
+    DEBUG_MSG("")
     const int use_sparse = analysis->use_sparse;
 
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
@@ -1466,6 +1472,7 @@ static void analyse_transient_euler_one_step(struct netlist_info *netlist,
 
 static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
                                               struct cmd_tran *transient) {
+    DEBUG_MSG("")
     const int use_sparse = analysis->use_sparse;
 
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
@@ -1524,6 +1531,7 @@ static void analyse_transient_trapezoid_one_step(struct netlist_info *netlist,
                                                  struct analysis_info *analysis,
                                                  dfloat_t *x_prev, dfloat_t *vector_prev,
                                                  const dfloat_t time_step) {
+    DEBUG_MSG("")
     const int use_sparse = analysis->use_sparse;
 
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
