@@ -14,7 +14,7 @@ caper: $(OBJ)
 .PHONY: clean
 
 clean:
-	rm -f *.o *~ core caper
+	rm -f $(OBJ) *~ core caper
 
 archive:
 	git archive --format=zip master -o caper.zip
