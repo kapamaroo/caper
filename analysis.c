@@ -9,11 +9,14 @@
 #include <gsl/gsl_linalg.h>
 #include <math.h>
 
+extern int debug_on;
+extern int force_sparse;
+
 #define MSG(msg) do { printf("INFO : %-24s(): %s\n",__FUNCTION__,msg); } while (0);
 #ifdef NDEBUG
 #define DEBUG_MSG(msg)
 #else
-#define DEBUG_MSG(msg) do { printf("DEBUG: %-24s(): %s\n",__FUNCTION__,msg); } while (0);
+#define DEBUG_MSG(msg) do { if (debug_on) printf("DEBUG: %-24s(): %s\n",__FUNCTION__,msg); } while (0);
 #endif
 
 #define BI_CG_EPSILON 1e-14
@@ -1051,6 +1054,9 @@ static void write_results(struct netlist_info *netlist, struct analysis_info *an
 }
 
 static int get_sparse(struct command *pool, unsigned long size) {
+    if (force_sparse)
+        return 1;
+
     unsigned long i;
     for (i=0; i<size; ++i) {
         struct command *cmd = &pool[size - 1 - i];
