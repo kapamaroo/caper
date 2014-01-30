@@ -8,7 +8,6 @@
 #include <string.h>
 #include <gsl/gsl_linalg.h>
 #include <math.h>
-#include "csparse/csparse.h"
 
 #define MSG(msg) do { printf("INFO : %-24s(): %s\n",__FUNCTION__,msg); } while (0);
 #ifdef NDEBUG
