@@ -37,11 +37,11 @@ void options() {
 
 void help(int argc, char *argv[]) {
     about();
-    options();
 
     printf("\n" ANSI_COLOR_RED "USAGE" ANSI_COLOR_RESET "\n");
     printf("\t%s [-d] [-s] NETLIST_FILE\n",argv[0]);
 
+    options();
     authors();
     more();
     printf("\n");
