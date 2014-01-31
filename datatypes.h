@@ -67,7 +67,7 @@ struct cmd_print_plot_item {
     };
 };
 
-#define MAX_PRINT_PLOT_ITEMS 16
+#define MAX_PRINT_PLOT_ITEMS 32
 #define MAX_LOG_FILENAME 16
 
 struct cmd_print_plot {
