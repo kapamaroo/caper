@@ -761,28 +761,35 @@ char *parse_string(char **buf, char *info) {
 char parse_char(char **buf, char *patterns, char *info) {
     assert(patterns && strlen(patterns));
 
+    //if info == NULL, do not fail if patterns not found and return NULL char '\0'
+
     char *end = current_input->raw_end;
     if (*buf == end)
         *buf = NULL;
     if (!*buf) {
+        if (!info)
+            return '\0';
         printf("error:%lu: expected %s - exit.\n",line_num,info);
         exit(EXIT_FAILURE);
     }
 
     char c = tolower(**buf);
-    (*buf)++;
-    if (*buf == end)
-        *buf = NULL;
 
     char *p = patterns;
     while (*p != '\0' && c != tolower(*p))
         p++;
 
     if (*p == '\0') {
+        if (!info)
+            return '\0';
         printf("error:%lu: parsing %s, expected '%s' got '%c' 0x%02x (hex ascii) - exit\n",
                line_num,info,patterns,c,c);
         exit(EXIT_FAILURE);
     }
+
+    (*buf)++;
+    if (*buf == end)
+        *buf = NULL;
 
     return c;
 }
