@@ -660,7 +660,7 @@ void parse_line(char **buf) {
     int garbage = discard_line(buf);
     if (garbage) {
         printf("warning: %d garbage characters at end of line %lu\n", garbage, line_num);
-        exit(EXIT_FAILURE);
+        //exit(EXIT_FAILURE);
     }
 }
 
