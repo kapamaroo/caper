@@ -1162,9 +1162,18 @@ void parse_print_plot_item(char **buf, struct command *cmd) {
         exit(EXIT_FAILURE);
     }
 
-    char el_type = parse_char(buf,"vi","print/plot type");
-    parse_eat_whitechars(buf);
-    assert(el_type == 'v' || el_type == 'i');
+    char el_type = parse_char(buf,"vit","print/plot type");
+    if (el_type == 't') {
+        //'tran' keyword
+        char *tmp = parse_string(buf,"literal string 'ran'");
+        if (strcmp(tmp,"ran")) {
+            printf("error:%lu: expected literal string 'tran' - exit\n",line_num);
+            exit(EXIT_FAILURE);
+        }
+        free(tmp);
+        //read the real el_type
+        el_type = parse_char(buf,"vi","print/plot type");
+    }
 
     parse_eat_whitechars(buf);
     parse_char(buf,"(","lparen");
