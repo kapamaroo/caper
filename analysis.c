@@ -1301,6 +1301,9 @@ static void close_logfiles(struct netlist_info *netlist) {
 }
 
 static void analyse_log(struct analysis_info *analysis) {
+    if (!debug_on)
+        return;
+
     const int use_sparse = analysis->use_sparse;
 
     MSG("writing A and b to files ...")
