@@ -11,6 +11,8 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
+#include <math.h>
+#include <float.h>
 
 #include "parser.h"
 #include "hash.h"
@@ -894,13 +896,19 @@ static dfloat_t get_init_transient_value(struct element *el) {
     return el->value;
 }
 
+#define TOL DBL_EPSILON
+
+static inline int __eq(const double a, const double b) {
+    return fabs(a - b) <= TOL;
+}
+
 static void check_transient(struct element *el) {
     assert(el);
     dfloat_t initial_transient_value = get_init_transient_value(el);
-    if (initial_transient_value != el->value) {
+    if (!__eq(initial_transient_value,el->value)) {
         printf("***  WARNING  ***    transient analysis may produce inaccurate results\n");
         printf("                     in source '%s':\n",el->name);
-        printf("                     reason: (dc value) %lf != %f (initial transient value)\n",
+        printf("                     reason: (dc value) %g != %g (initial transient value)\n",
                el->value,initial_transient_value);
     }
 }
