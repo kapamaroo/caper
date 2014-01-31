@@ -1248,7 +1248,7 @@ void parse_command(char **buf) {
     enum cmd_type type = get_cmd_type(cmd);
 
     if (type == CMD_BAD_COMMAND) {
-        printf("***  WARNING  ***    Unknown command '%s' - error\n",cmd);
+        printf("***  WARNING  ***    Unknown command '%s'\n",cmd);
         free(cmd);
         return;
     }
