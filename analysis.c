@@ -1306,7 +1306,7 @@ static void analyse_log(struct analysis_info *analysis) {
 
     const int use_sparse = analysis->use_sparse;
 
-    MSG("writing A and b to files ...")
+    DEBUG_MSG("writing A and b to files ...")
     unsigned long mna_dim_size = analysis->n + analysis->el_group2_size;
     if (use_sparse)
         cs_print(analysis->cs_mna_matrix,"mna_sparse_matrix.log",0);
