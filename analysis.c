@@ -1015,7 +1015,10 @@ void solve_bi_cg_sparse(struct analysis_info *analysis, dfloat_t tol) {
     free(_q_);
 }
 
-static void write_result(FILE *f, struct cmd_print_plot_item *item, struct analysis_info *analysis) {
+static void write_result(FILE *f,
+                         struct cmd_print_plot_item *item,
+                         struct analysis_info *analysis,
+                         const dfloat_t abs_time) {
     dfloat_t value = 0;
     char *name = NULL;
 
@@ -1033,14 +1036,16 @@ static void write_result(FILE *f, struct cmd_print_plot_item *item, struct analy
         value = analysis->x[idx];
     }
 
-    int status = fprintf(f,"%s:%5.2g\n",name,value);
+    int status = fprintf(f,"%s : %5.3f : %+e\n",name,abs_time,value);
     if (status < 0) {
         perror(__FUNCTION__);
         exit(EXIT_FAILURE);
     }
 }
 
-static void write_results(struct netlist_info *netlist, struct analysis_info *analysis) {
+static void write_results(struct netlist_info *netlist,
+                          struct analysis_info *analysis,
+                          const dfloat_t abs_time) {
     DEBUG_MSG("")
     unsigned long i;
     unsigned long j;
@@ -1048,7 +1053,9 @@ static void write_results(struct netlist_info *netlist, struct analysis_info *an
         struct command *cmd = &netlist->cmd_pool[i];
         if (cmd->type == CMD_PRINT || cmd->type == CMD_PLOT)
             for (j=0; j<cmd->print_plot.item_num; ++j)
-                write_result(cmd->print_plot.f,&cmd->print_plot.item[j],analysis);
+                write_result(cmd->print_plot.f,
+                             &cmd->print_plot.item[j],
+                             analysis,abs_time);
 
     }
 }
@@ -1184,7 +1191,6 @@ static void analyse_dc_one_step(struct netlist_info *netlist,
     case S_SPD_ITER_SPARSE:  solve_cg_sparse(analysis,tol);     break;
     case S_LU_SPARSE:        solve_LU_sparse(analysis);         break;
     }
-    write_results(netlist,analysis);
 }
 
 static void analyse_dc_init(struct cmd_dc *dc,
@@ -1256,9 +1262,11 @@ static void analyse_dc(struct cmd_dc *dc,
     analyse_dc_init(dc,netlist,analysis,_solver,tol);
     unsigned long i;
     unsigned long repeat = (dc->end - dc->begin)/dc->step;
+    const dfloat_t abs_time = 0.0;
     for (i=0; i<repeat; ++i) {
         analyse_dc_update(dc,netlist,analysis,_solver,tol);
         analyse_dc_one_step(netlist,analysis);
+        write_results(netlist,analysis,abs_time);
     }
 }
 
@@ -1476,7 +1484,6 @@ static void analyse_transient_euler_one_step(struct netlist_info *netlist,
         analysis->mna_vector = orig_mna_vector;
     }
     free(tmp);
-    write_results(netlist,analysis);
 }
 
 static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
@@ -1575,7 +1582,6 @@ static void analyse_transient_trapezoid_one_step(struct netlist_info *netlist,
         analysis->mna_vector = orig_mna_vector;
     }
     free(tmp);
-    write_results(netlist,analysis);
 }
 
 void analyse_transient(struct cmd_tran *transient,
@@ -1611,6 +1617,7 @@ void analyse_transient(struct cmd_tran *transient,
             analyse_transient_update(netlist,analysis,abs_time);
             analyse_transient_trapezoid_one_step(netlist,analysis,x_prev,
                                                  vector_prev,transient->time_step);
+            write_results(netlist,analysis,abs_time);
         }
         free(vector_prev);
         break;
@@ -1623,6 +1630,7 @@ void analyse_transient(struct cmd_tran *transient,
             analyse_transient_update(netlist,analysis,abs_time);
             analyse_transient_euler_one_step(netlist,analysis,x_prev,
                                              transient->time_step);
+            write_results(netlist,analysis,abs_time);
         }
         break;
     }

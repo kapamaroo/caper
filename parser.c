@@ -65,6 +65,7 @@ static unsigned long node_pool_next = 1;
 struct node *node_pool = NULL;
 
 static unsigned int node_hash_size = 1013;
+//static unsigned int node_hash_size = 2011111;
 struct hash_table *node_hash_table = NULL;
 
 static unsigned int cmd_pool_size = INIT_CMD_POOL_SIZE;
@@ -168,7 +169,8 @@ unsigned long grow(void **pool,unsigned long size, unsigned long element_size,
     //if we use more than half bits of unsigned long, increase size
     //with a constant, else duplicate it
     unsigned long bits = sizeof(unsigned long) * CHAR_BIT;
-    unsigned long inc = 1 << 8;
+    unsigned long inc = 1 << 10;
+    //unsigned long inc = 1 << 21;
     unsigned long new_size;
 
     if (size == 0)
@@ -664,6 +666,8 @@ void parse_line(char **buf) {
         printf("warning: %d garbage characters at end of line %lu\n", garbage, line_num);
         //exit(EXIT_FAILURE);
     }
+    if (line_num % 512 == 0)
+        printf("line: %8lu\n",line_num);
 }
 
 inline static int isdelimiter(char c) {
