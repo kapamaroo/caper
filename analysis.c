@@ -432,30 +432,16 @@ void solve_LU_sparse(struct analysis_info *analysis) {
         analysis->n + analysis->el_group2_size;
 
     //sparse magic
-    assert(analysis->cs_mna_N);
-    assert(analysis->cs_mna_S);
+    assert(analysis->cs_mna_matrix);
 
-    csn *N = analysis->cs_mna_N;
-    css *S = analysis->cs_mna_S;
-    dfloat_t *b = analysis->mna_vector;
-    dfloat_t *x = analysis->x;
+    cs *A = analysis->cs_mna_matrix;
+    dfloat_t *b = analysis->x;
 
-    int size = mna_dim_size;
+    memcpy(b,analysis->mna_vector,mna_dim_size*sizeof(dfloat_t));
 
-    if (!cs_ipvec(N->pinv,b,x,size)) {
-        printf("cs_ipvec() failed - exit.\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!cs_lsolve(N->L,x)) {
-        printf("cs_lsolve() failed - exit.\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!cs_usolve(N->U,x)) {
-        printf("cs_usolve() failed - exit.\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!cs_ipvec(S->q,x,b,size)) {
-        printf("cs_ipvec() failed - exit.\n");
+    const double tol = 1e-14;
+    if (!cs_lusol(2,A,b,tol)) {
+        printf("cs_lusol() failed - exit.\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -488,28 +474,13 @@ void solve_cholesky_sparse(struct analysis_info *analysis) {
         analysis->n + analysis->el_group2_size;
 
     //sparse magic
-    assert(analysis->cs_mna_N);
-    assert(analysis->cs_mna_S);
+    cs *A = analysis->cs_mna_matrix;
+    dfloat_t *b = analysis->x;
 
-    csn *N = analysis->cs_mna_N;
-    css *S = analysis->cs_mna_S;
-    dfloat_t *b = analysis->mna_vector;
-    dfloat_t *x = analysis->x;
+    memcpy(b,analysis->mna_vector,mna_dim_size*sizeof(dfloat_t));
 
-    if (!cs_ipvec(S->pinv,b,x,mna_dim_size)) {
-        printf("cs_ipvec() failed - exit.\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!cs_lsolve(N->L,x)) {
-        printf("cs_lsolve() failed - exit.\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!cs_ltsolve(N->L,x)) {
-        printf("cs_ltsolve() failed - exit.\n");
-        exit(EXIT_FAILURE);
-    }
-    if (!cs_pvec(S->pinv,x,b,mna_dim_size)) {
-        printf("cs_pvec() failed - exit.\n");
+    if (!cs_cholsol(1,A,b)) {
+        printf("cs_cholsol() failed - exit.\n");
         exit(EXIT_FAILURE);
     }
 }
