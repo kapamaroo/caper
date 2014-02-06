@@ -1415,6 +1415,9 @@ static void analysis_transient_euler_init(struct analysis_info *analysis,
         _dot_add(analysis->mna_matrix,analysis->mna_matrix,h,
                  analysis->transient_matrix,mna_dim_size*mna_dim_size);
         decomp_LU(analysis);
+
+        _dot_add(analysis->transient_matrix,analysis->transient_matrix,h-1,
+                 analysis->transient_matrix,mna_dim_size*mna_dim_size);
     }
 }
 
@@ -1446,7 +1449,7 @@ static void analyse_transient_euler_one_step(struct netlist_info *netlist,
     }
     else {
         _mult(tmp,analysis->transient_matrix,x_prev,mna_dim_size);
-        _dot_add(tmp,analysis->mna_vector,1/time_step,tmp,mna_dim_size);
+        _dot_add(tmp,analysis->mna_vector,1,tmp,mna_dim_size);
 
         dfloat_t *orig_mna_vector = analysis->mna_vector;
         analysis->mna_vector = tmp;
@@ -1459,6 +1462,7 @@ static void analyse_transient_euler_one_step(struct netlist_info *netlist,
 
 static void analysis_transient_trapezoid_init(struct analysis_info *analysis,
                                               struct cmd_tran *transient) {
+
     DEBUG_MSG("")
     const int use_sparse = analysis->use_sparse;
 
