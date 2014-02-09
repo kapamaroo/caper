@@ -45,6 +45,7 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     cs *cs_transient_matrix = NULL;
     dfloat_t *mna_matrix = NULL;
     dfloat_t *transient_matrix = NULL;
+    dfloat_t *decomp = NULL;
 
     if (use_sparse) {
         unsigned long nonzeros = count_nonzeros(netlist);
@@ -71,6 +72,12 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
                mna_dim_size * mna_dim_size * sizeof(dfloat_t));
         mna_matrix = (dfloat_t*)calloc(mna_dim_size*mna_dim_size,sizeof(dfloat_t));
         if (!mna_matrix) {
+            perror(__FUNCTION__);
+            exit(EXIT_FAILURE);
+        }
+
+        decomp = (dfloat_t*)calloc(mna_dim_size*mna_dim_size,sizeof(dfloat_t));
+        if (!decomp) {
             perror(__FUNCTION__);
             exit(EXIT_FAILURE);
         }
@@ -268,6 +275,8 @@ void analysis_init(struct netlist_info *netlist, struct analysis_info *analysis)
     analysis->x = x;
     analysis->mna_vector = mna_vector;
 
+    analysis->decomp = decomp;
+
     analysis->cs_mna_matrix = cs_mna_matrix;
     analysis->cs_transient_matrix = cs_transient_matrix;
     analysis->mna_matrix = mna_matrix;
@@ -331,9 +340,12 @@ void decomp_LU(struct analysis_info *analysis) {
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
+    memcpy(analysis->decomp,analysis->mna_matrix,
+           mna_dim_size*mna_dim_size*sizeof(dfloat_t));
+
     //GSL magic
     gsl_matrix_view Aview =
-        gsl_matrix_view_array(analysis->mna_matrix,
+        gsl_matrix_view_array(analysis->decomp,
                               mna_dim_size,
                               mna_dim_size);
 
@@ -350,7 +362,7 @@ void solve_LU(struct analysis_info *analysis) {
 
     //GSL magic
     gsl_matrix_view Aview =
-        gsl_matrix_view_array(analysis->mna_matrix,
+        gsl_matrix_view_array(analysis->decomp,
                               mna_dim_size,
                               mna_dim_size);
 
@@ -371,9 +383,12 @@ void decomp_cholesky(struct analysis_info *analysis) {
     unsigned long mna_dim_size =
         analysis->n + analysis->el_group2_size;
 
+    memcpy(analysis->decomp,analysis->mna_matrix,
+           mna_dim_size*mna_dim_size*sizeof(dfloat_t));
+
     //GSL magic
     gsl_matrix_view Aview =
-        gsl_matrix_view_array(analysis->mna_matrix,
+        gsl_matrix_view_array(analysis->decomp,
                               mna_dim_size,
                               mna_dim_size);
 
@@ -387,7 +402,7 @@ void solve_cholesky(struct analysis_info *analysis) {
 
     //GSL magic
     gsl_matrix_view Aview =
-        gsl_matrix_view_array(analysis->mna_matrix,
+        gsl_matrix_view_array(analysis->decomp,
                               mna_dim_size,
                               mna_dim_size);
 

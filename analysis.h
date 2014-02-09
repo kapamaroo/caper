@@ -49,6 +49,8 @@ struct analysis_info {
 
     dfloat_t *transient_matrix;
 
+    dfloat_t *decomp;
+
     //sparse matrix members
     cs *cs_mna_matrix;        //G
     cs *cs_transient_matrix;  //C
