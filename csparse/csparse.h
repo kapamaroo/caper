@@ -627,6 +627,6 @@ int cs_entry(cs *T, int i, int j, double x);
  *  @return 0 on error and 1 otherwise.
  */
 int cs_print(const cs *A, const char *outputFilename, int brief);
-
+double *cs_uncompress(const cs *A);
 
 #endif /* SPARSE_MATRIX_H_ */

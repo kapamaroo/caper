@@ -1757,3 +1757,27 @@ int cs_print(const cs *A, const char *outputFilename, int brief) {
 	fclose(outputFilePtr);
 	return (1);
 }
+
+double *cs_uncompress(const cs *A) {
+    if (CS_TRIPLET(A))
+        return NULL;
+
+    double *m = (double*)calloc(A->m*A->n,sizeof(double));
+    if (!m)
+        return NULL;
+
+    int *Ap = A->p;             // column pointer
+    int *Ai = A->i;             // row indices
+    double *Ax = A->x;          // values;
+
+    int i;
+    int j;
+    for (i=0; i<A->n; i++) {
+        int rbeg = Ap[i];
+        int rend = Ap[i+1];
+        if (rend > rbeg)
+            for (j=rbeg; j<rend; j++)
+                m[Ai[j]*A->n + i] = Ax[j];
+    }
+    return m;
+}
