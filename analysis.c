@@ -1399,17 +1399,17 @@ static void analysis_transient_euler_init(struct analysis_info *analysis,
     dfloat_t h = 1/transient->time_step;
 
     if (use_sparse) {
-        cs *tmp = analysis->cs_mna_matrix;
+        cs *orig_mna_matrix = analysis->cs_mna_matrix;
         analysis->cs_mna_matrix =
             cs_add(analysis->cs_mna_matrix,analysis->cs_transient_matrix,1,h);
-        cs_free(tmp);
+        cs_free(orig_mna_matrix);
         decomp_LU_sparse(analysis);
 
         //compute h*C
-        tmp = analysis->cs_transient_matrix;
+        cs *orig_transient_matrix = analysis->cs_transient_matrix;
         analysis->cs_transient_matrix =
             cs_add(analysis->cs_transient_matrix,analysis->cs_transient_matrix,h,0);
-        cs_free(tmp);
+        cs_free(orig_transient_matrix);
     }
     else {
         _dot_add(analysis->mna_matrix,analysis->mna_matrix,h,
